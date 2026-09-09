@@ -1,6 +1,9 @@
 (() => {
   const DEFAULTS = {
     provider: 'codex',
+    codexModel: 'auto',
+    codexEffort: 'auto',
+    antigravityModel: 'auto',
     responseLanguage: 'auto',
     responseStyle: 'balanced',
     webSearch: 'auto',
@@ -12,17 +15,13 @@
     panelSize: 'standard',
     rememberHistory: true,
     historyLimit: 30,
-    geminiAuthMode: 'vertex',
-    geminiProject: '',
-    geminiLocation: 'global',
-    geminiModel: 'gemini-3.8-flash',
   };
 
   const state = {
     videoId: null,
     transcript: [],
     connected: false,
-    account: null,
+    providerStatus: null,
     busy: false,
     lastUrl: location.href,
     settings: { ...DEFAULTS },
@@ -35,14 +34,8 @@
       chrome.runtime.sendMessage(
         { type: 'BRIDGE_FETCH', path, method, body },
         response => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          if (!response) {
-            reject(new Error('Aucune réponse du service worker Professor Ask.'));
-            return;
-          }
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          if (!response) return reject(new Error('Aucune réponse du service worker Professor Ask.'));
           resolve(response);
         },
       );
@@ -67,7 +60,12 @@
   }
 
   function providerName() {
-    return state.settings.provider === 'gemini' ? 'Gemini' : 'Codex';
+    return state.settings.provider === 'antigravity' ? 'Antigravity' : 'Codex';
+  }
+
+  function selectedModelName() {
+    if (state.settings.provider === 'antigravity') return state.settings.antigravityModel || 'auto';
+    return state.settings.codexModel || 'auto';
   }
 
   async function loadSettings() {
@@ -90,18 +88,14 @@
 
   async function fetchProviderStatus() {
     try {
-      let response;
-      if (state.settings.provider === 'gemini') {
-        response = await bridgeFetch(`/gemini/status?mode=${encodeURIComponent(state.settings.geminiAuthMode || 'vertex')}`);
-      } else {
-        response = await bridgeFetch('/account');
-      }
+      const provider = state.settings.provider === 'antigravity' ? 'antigravity' : 'codex';
+      const response = await bridgeFetch(`/providers/${provider}/status`);
       const data = response.data || {};
       state.connected = !!(response.ok && data.connected);
-      state.account = data.account || data || null;
+      state.providerStatus = data;
     } catch {
       state.connected = false;
-      state.account = null;
+      state.providerStatus = null;
     }
     renderStatus();
   }
@@ -112,9 +106,7 @@
         addMessage('error', `Impossible d'ouvrir les paramètres : ${chrome.runtime.lastError.message}`);
         return;
       }
-      if (response && response.ok === false) {
-        addMessage('error', response.error || 'Impossible d’ouvrir les paramètres.');
-      }
+      if (response && response.ok === false) addMessage('error', response.error || 'Impossible d’ouvrir les paramètres.');
     });
   }
 
@@ -126,6 +118,8 @@
 
     if (state.connected) {
       status.innerHTML = `<span class="pa-dot ok"></span><span>${providerName()} connecté</span>`;
+    } else if (state.providerStatus?.installed === false) {
+      status.innerHTML = `<span class="pa-dot warn"></span><span>${providerName()} CLI absent</span>`;
     } else {
       status.innerHTML = `<span class="pa-dot warn"></span><span>${providerName()} hors ligne</span>`;
     }
@@ -165,9 +159,9 @@
     secondary.prepend(root);
     qs('#pa-settings').addEventListener('click', openSettings);
     qs('#pa-send').addEventListener('click', sendQuestion);
-    qs('#pa-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+    qs('#pa-input').addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
         sendQuestion();
       }
     });
@@ -200,7 +194,7 @@
   }
 
   async function storageGet(key) {
-    return new Promise(resolve => chrome.storage.local.get([key], x => resolve(x[key])));
+    return new Promise(resolve => chrome.storage.local.get([key], value => resolve(value[key])));
   }
 
   async function storageSet(key, value) {
@@ -208,7 +202,7 @@
   }
 
   function historyKey() {
-    return `pa-history:${state.videoId || 'none'}`;
+    return `pa-history:${state.videoId || 'none'}:${state.settings.provider}`;
   }
 
   async function loadHistory() {
@@ -227,8 +221,7 @@
       box.innerHTML = '<div class="pa-empty" id="pa-empty">Pose une question sur ce qui vient d\'être dit dans la vidéo.</div>';
       return;
     }
-
-    history.forEach(m => addMessage(m.role, m.text, m.meta || ''));
+    history.forEach(message => addMessage(message.role, message.text, message.meta || ''));
   }
 
   async function saveHistory() {
@@ -236,11 +229,11 @@
     const nodes = [...document.querySelectorAll('#pa-messages .pa-msg')];
     const limit = Number(state.settings.historyLimit) || 30;
     const history = nodes
-      .filter(n => !n.classList.contains('error'))
-      .map(n => ({
-        role: n.classList.contains('user') ? 'user' : 'assistant',
-        meta: n.querySelector('.pa-msg-meta')?.textContent || '',
-        text: n.lastElementChild?.textContent || n.textContent,
+      .filter(node => !node.classList.contains('error'))
+      .map(node => ({
+        role: node.classList.contains('user') ? 'user' : 'assistant',
+        meta: node.querySelector('.pa-msg-meta')?.textContent || '',
+        text: node.lastElementChild?.textContent || node.textContent,
       }))
       .slice(-limit);
     await storageSet(historyKey(), history);
@@ -251,7 +244,7 @@
     const radius = Number(state.settings.contextSeconds) || 180;
     const start = Math.max(0, time - radius);
     const end = time + radius;
-    return state.transcript.filter(x => x.start <= end && (x.start + x.duration) >= start);
+    return state.transcript.filter(item => item.start <= end && (item.start + item.duration) >= start);
   }
 
   function formatAnswer(answer, sources) {
@@ -270,7 +263,7 @@
     if (!question) return;
 
     if (!state.connected) {
-      addMessage('error', `${providerName()} n’est pas connecté. Ouvre les paramètres de Professor Ask pour configurer le fournisseur.`);
+      addMessage('error', `${providerName()} n’est pas connecté. Ouvre les paramètres pour lancer la connexion OAuth.`);
       return;
     }
 
@@ -282,7 +275,8 @@
     input.value = '';
     state.busy = true;
     send.disabled = true;
-    const placeholder = addMessage('assistant', 'Réflexion…', providerName());
+    const model = selectedModelName();
+    const placeholder = addMessage('assistant', 'Réflexion…', model === 'auto' ? providerName() : `${providerName()} · ${model}`);
 
     try {
       const includeMetadata = !!state.settings.includeMetadata;
@@ -290,7 +284,6 @@
         ? (qs('h1 yt-formatted-string')?.textContent?.trim() || document.title.replace(/ - YouTube$/, ''))
         : '';
       const channel = includeMetadata ? (qs('ytd-channel-name a')?.textContent?.trim() || '') : '';
-      const context = transcriptContextAt(t);
 
       const response = await bridgeFetch('/chat', {
         method: 'POST',
@@ -301,15 +294,14 @@
           channel,
           timestamp: t,
           question,
-          transcript: context,
+          transcript: transcriptContextAt(t),
           settings: {
             responseLanguage: state.settings.responseLanguage,
             responseStyle: state.settings.responseStyle,
             webSearch: state.settings.webSearch,
-            geminiAuthMode: state.settings.geminiAuthMode,
-            geminiProject: state.settings.geminiProject,
-            geminiLocation: state.settings.geminiLocation,
-            geminiModel: state.settings.geminiModel,
+            codexModel: state.settings.codexModel,
+            codexEffort: state.settings.codexEffort,
+            antigravityModel: state.settings.antigravityModel,
           },
         },
       });
@@ -318,9 +310,9 @@
       if (!response.ok) throw new Error(response.error || data.error || `Erreur ${providerName()}`);
       placeholder.lastElementChild.textContent = formatAnswer(data.answer, data.sources);
       await saveHistory();
-    } catch (e) {
+    } catch (error) {
       placeholder.remove();
-      addMessage('error', e.message);
+      addMessage('error', error.message);
     } finally {
       state.busy = false;
       send.disabled = false;
@@ -335,13 +327,13 @@
 
   function chooseTrack(tracks) {
     const preferred = state.settings.transcriptLanguage;
-    if (preferred === 'fr') return tracks.find(t => /^fr([_-]|$)/i.test(t.languageCode)) || tracks[0];
-    if (preferred === 'en') return tracks.find(t => /^en([_-]|$)/i.test(t.languageCode)) || tracks[0];
+    if (preferred === 'fr') return tracks.find(track => /^fr([_-]|$)/i.test(track.languageCode)) || tracks[0];
+    if (preferred === 'en') return tracks.find(track => /^en([_-]|$)/i.test(track.languageCode)) || tracks[0];
 
     const browserLanguage = (navigator.language || '').split('-')[0];
-    return tracks.find(t => t.languageCode?.toLowerCase().startsWith(browserLanguage.toLowerCase()))
-      || tracks.find(t => /^fr([_-]|$)/i.test(t.languageCode))
-      || tracks.find(t => /^en([_-]|$)/i.test(t.languageCode))
+    return tracks.find(track => track.languageCode?.toLowerCase().startsWith(browserLanguage.toLowerCase()))
+      || tracks.find(track => /^fr([_-]|$)/i.test(track.languageCode))
+      || tracks.find(track => /^en([_-]|$)/i.test(track.languageCode))
       || tracks[0];
   }
 
@@ -351,23 +343,23 @@
     if (badge) badge.textContent = 'Transcription...';
 
     try {
-      const html = await fetch(location.href, { credentials: 'include' }).then(r => r.text());
-      const m = html.match(/"captionTracks":(\[.*?\]),"audioTracks"/s);
-      if (!m) throw new Error('no captions');
-      const tracks = JSON.parse(m[1]);
+      const html = await fetch(location.href, { credentials: 'include' }).then(response => response.text());
+      const match = html.match(/"captionTracks":(\[.*?\]),"audioTracks"/s);
+      if (!match) throw new Error('no captions');
+      const tracks = JSON.parse(match[1]);
       const preferred = chooseTrack(tracks);
       if (!preferred?.baseUrl) throw new Error('no caption url');
 
       const url = preferred.baseUrl + (preferred.baseUrl.includes('?') ? '&' : '?') + 'fmt=json3';
-      const json = await fetch(url, { credentials: 'include' }).then(r => r.json());
-      state.transcript = (json.events || [])
-        .filter(e => e.segs?.length)
-        .map(e => ({
-          start: (e.tStartMs || 0) / 1000,
-          duration: (e.dDurationMs || 0) / 1000,
-          text: decodeHtml(e.segs.map(s => s.utf8 || '').join('').replace(/\n/g, ' ')).trim(),
+      const data = await fetch(url, { credentials: 'include' }).then(response => response.json());
+      state.transcript = (data.events || [])
+        .filter(event => event.segs?.length)
+        .map(event => ({
+          start: (event.tStartMs || 0) / 1000,
+          duration: (event.dDurationMs || 0) / 1000,
+          text: decodeHtml(event.segs.map(segment => segment.utf8 || '').join('').replace(/\n/g, ' ')).trim(),
         }))
-        .filter(x => x.text);
+        .filter(item => item.text);
 
       if (badge) badge.textContent = `${state.transcript.length} segments`;
     } catch {
@@ -388,12 +380,13 @@
   chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area !== 'sync') return;
     const previousTranscriptLanguage = state.settings.transcriptLanguage;
+    const previousProvider = state.settings.provider;
     for (const [key, change] of Object.entries(changes)) {
       if (key in DEFAULTS) state.settings[key] = change.newValue;
     }
     applyAppearance();
     renderStatus();
-    await loadHistory();
+    if (previousProvider !== state.settings.provider) await loadHistory();
     if (previousTranscriptLanguage !== state.settings.transcriptLanguage) await loadTranscript();
     await fetchProviderStatus();
   });
@@ -411,7 +404,7 @@
 
   setInterval(() => {
     if (getVideoId()) fetchProviderStatus();
-  }, 15000);
+  }, 60000);
 
   setTimeout(onVideoChanged, 800);
 })();
