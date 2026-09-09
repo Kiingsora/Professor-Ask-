@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 
-export function runCommand(command, args = [], { timeoutMs = 30000, cwd } = {}) {
+export function runCommand(command, args = [], { timeoutMs = 30000, cwd, shell = false } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      shell: process.platform === 'win32',
+      shell,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
