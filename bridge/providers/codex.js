@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 import { buildProfessorPrompt } from '../lib/prompt.js';
-import { openExternal } from '../lib/process-utils.js';
 
 export class CodexProvider {
   constructor() {
@@ -54,7 +53,7 @@ export class CodexProvider {
       clientInfo: {
         name: 'professor-ask',
         title: 'Professor Ask',
-        version: '0.4.0',
+        version: '0.5.1',
       },
       capabilities: { experimentalApi: true },
     }, 15000);
@@ -146,20 +145,11 @@ export class CodexProvider {
       useHostedLoginSuccessPage: true,
     }, 30000);
 
-    const authUrl = login?.authUrl || null;
-    let opened = false;
-    if (authUrl) {
-      try {
-        await openExternal(authUrl);
-        opened = true;
-      } catch {}
-    }
-
     return {
       started: true,
-      opened,
+      opened: false,
       loginId: login?.loginId || null,
-      authUrl,
+      authUrl: login?.authUrl || null,
     };
   }
 
