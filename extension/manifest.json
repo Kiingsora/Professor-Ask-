@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Professor Ask",
-  "version": "0.2.1",
-  "description": "Discuss YouTube videos with an AI using timestamped transcript context.",
+  "version": "0.3.0",
+  "description": "Discuss YouTube videos with Codex or Gemini using timestamped transcript context.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://www.youtube.com/*",
