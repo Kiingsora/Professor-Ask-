@@ -4,9 +4,14 @@ const ALLOWED_BRIDGE_PATHS = new Set([
   '/account',
   '/login',
   '/chat',
-  '/gemini/status',
-  '/gemini/login',
-  '/gemini/api-key',
+  '/providers/codex/status',
+  '/providers/codex/login',
+  '/providers/codex/logout',
+  '/providers/codex/models',
+  '/providers/antigravity/status',
+  '/providers/antigravity/login',
+  '/providers/antigravity/logout',
+  '/providers/antigravity/models',
 ]);
 
 chrome.action.onClicked.addListener(() => {
@@ -16,6 +21,13 @@ chrome.action.onClicked.addListener(() => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'OPEN_OPTIONS') {
     chrome.runtime.openOptionsPage()
+      .then(() => sendResponse({ ok: true }))
+      .catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message?.type === 'OPEN_EXTERNAL' && typeof message.url === 'string') {
+    chrome.tabs.create({ url: message.url })
       .then(() => sendResponse({ ok: true }))
       .catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
