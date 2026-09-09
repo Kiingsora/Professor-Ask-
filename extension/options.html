@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Professor Ask — Paramètres</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="settings-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Professor Ask</p>
+        <h1>Paramètres</h1>
+        <p class="lede">Configure le fournisseur IA, le contexte vidéo, le comportement des réponses et la confidentialité.</p>
+      </div>
+      <div class="save-state" id="save-state">Enregistré</div>
+    </header>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <h2>Fournisseur IA</h2>
+          <p>Choisis le compte utilisé pour répondre aux questions.</p>
+        </div>
+      </div>
+
+      <div class="provider-grid">
+        <label class="provider-card" data-provider-card="codex">
+          <input type="radio" name="provider" value="codex" />
+          <div class="provider-card-main">
+            <div class="provider-icon">C</div>
+            <div>
+              <strong>Codex</strong>
+              <span>Compte ChatGPT / Codex</span>
+            </div>
+          </div>
+          <div class="provider-status" id="codex-status">Vérification…</div>
+        </label>
+
+        <label class="provider-card" data-provider-card="gemini">
+          <input type="radio" name="provider" value="gemini" />
+          <div class="provider-card-main">
+            <div class="provider-icon">G</div>
+            <div>
+              <strong>Gemini</strong>
+              <span>Compte Google / Gemini</span>
+            </div>
+          </div>
+          <div class="provider-status muted">Connecteur chat à brancher</div>
+        </label>
+      </div>
+
+      <div class="connection-panel" id="codex-panel">
+        <div>
+          <strong>Connexion Codex</strong>
+          <p>L’authentification est gérée par le bridge local et le client Codex officiel. L’extension ne reçoit pas ton token OAuth.</p>
+        </div>
+        <div class="connection-actions">
+          <button class="button primary" id="connect-codex">Connecter Codex</button>
+          <button class="button" id="refresh-codex">Actualiser</button>
+        </div>
+      </div>
+
+      <div class="connection-panel" id="gemini-panel" hidden>
+        <div>
+          <strong>Gemini</strong>
+          <p>La page fournisseur est prête. Le transport Gemini n’est pas encore branché au bridge Professor Ask.</p>
+        </div>
+        <div class="connection-actions">
+          <button class="button primary" id="open-gemini">Ouvrir Gemini</button>
+          <button class="button" id="open-gemini-docs">Documentation Gemini</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <h2>Réponses de l’IA</h2>
+          <p>Détermine comment Professor Ask formule et vérifie ses réponses.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <label class="field">
+          <span>Langue des réponses</span>
+          <select id="response-language">
+            <option value="auto">Automatique</option>
+            <option value="fr">Français</option>
+            <option value="en">Anglais</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Niveau de détail</span>
+          <select id="response-style">
+            <option value="concise">Concis</option>
+            <option value="balanced">Équilibré</option>
+            <option value="detailed">Détaillé</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Recherche web</span>
+          <select id="web-search">
+            <option value="auto">Automatique si nécessaire</option>
+            <option value="always">Toujours vérifier si pertinent</option>
+            <option value="off">Désactivée</option>
+          </select>
+        </label>
+
+        <label class="toggle-row">
+          <div>
+            <span>Mettre la vidéo en pause quand j’envoie une question</span>
+            <small>Évite que le contexte temporel continue de bouger pendant la réponse.</small>
+          </div>
+          <input type="checkbox" id="pause-on-question" />
+        </label>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <h2>Contexte vidéo</h2>
+          <p>Contrôle la quantité de transcription envoyée avec chaque question.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <label class="field">
+          <span>Fenêtre de contexte autour du timestamp</span>
+          <select id="context-seconds">
+            <option value="60">± 1 minute</option>
+            <option value="180">± 3 minutes</option>
+            <option value="300">± 5 minutes</option>
+            <option value="600">± 10 minutes</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Langue de transcription préférée</span>
+          <select id="transcript-language">
+            <option value="auto">Automatique</option>
+            <option value="fr">Français en priorité</option>
+            <option value="en">Anglais en priorité</option>
+          </select>
+        </label>
+
+        <label class="toggle-row">
+          <div>
+            <span>Inclure le titre et la chaîne</span>
+            <small>Ajoute les métadonnées de la vidéo au contexte envoyé à l’IA.</small>
+          </div>
+          <input type="checkbox" id="include-metadata" />
+        </label>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading">
+        <div>
+          <h2>Interface</h2>
+          <p>Adapte le panneau Professor Ask à ton usage.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <label class="field">
+          <span>Thème du panneau</span>
+          <select id="theme">
+            <option value="auto">Suivre YouTube</option>
+            <option value="dark">Sombre</option>
+            <option value="light">Clair</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Hauteur du chat</span>
+          <select id="panel-size">
+            <option value="compact">Compacte</option>
+            <option value="standard">Standard</option>
+            <option value="large">Grande</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="settings-section danger-zone">
+      <div class="section-heading">
+        <div>
+          <h2>Historique et confidentialité</h2>
+          <p>Les conversations sont stockées localement dans l’extension.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <label class="toggle-row">
+          <div>
+            <span>Mémoriser les conversations par vidéo</span>
+            <small>Permet de retrouver la discussion quand tu reviens sur la même vidéo.</small>
+          </div>
+          <input type="checkbox" id="remember-history" />
+        </label>
+
+        <label class="field">
+          <span>Messages conservés par vidéo</span>
+          <select id="history-limit">
+            <option value="10">10 messages</option>
+            <option value="30">30 messages</option>
+            <option value="50">50 messages</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="danger-actions">
+        <button class="button danger" id="clear-history">Effacer tout l’historique</button>
+        <button class="button" id="reset-settings">Réinitialiser les paramètres</button>
+      </div>
+    </section>
+
+    <footer class="footer-note">
+      <span>Bridge local : <code>http://127.0.0.1:43119</code></span>
+      <span>Professor Ask v0.2</span>
+    </footer>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>
