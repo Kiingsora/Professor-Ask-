@@ -4,6 +4,7 @@ import { AntigravityProvider } from './providers/antigravity.js';
 
 const HOST = '127.0.0.1';
 const PORT = 43119;
+const VERSION = '0.4.1';
 
 const providers = new Map([
   ['codex', new CodexProvider()],
@@ -63,7 +64,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/health') {
       return json(res, 200, {
         ok: true,
-        version: '0.4.0',
+        version: VERSION,
+        pid: process.pid,
         providers: [...providers.keys()],
       });
     }
@@ -115,6 +117,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Professor Ask bridge v0.4: http://${HOST}:${PORT}`);
+  console.log(`Professor Ask bridge v${VERSION}: http://${HOST}:${PORT}`);
+  console.log(`PID: ${process.pid}`);
+  console.log('Auto-reload: actif (Node watch mode).');
   console.log('Providers: Codex OAuth ChatGPT + Google Antigravity OAuth.');
 });
