@@ -2,9 +2,9 @@ import http from 'node:http';
 import { CodexProvider } from './providers/codex.js';
 import { AntigravityProvider } from './providers/antigravity.js';
 
-const HOST = '127.0.0.1';
 const PORT = 43119;
-const VERSION = '0.4.1';
+const VERSION = '0.4.2';
+const LOOPBACK_HOSTS = ['127.0.0.1', '::1'];
 
 const providers = new Map([
   ['codex', new CodexProvider()],
@@ -16,6 +16,7 @@ function json(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(data),
+    'Cache-Control': 'no-store',
   });
   res.end(data);
 }
@@ -26,13 +27,18 @@ function cors(req, res) {
     || origin.startsWith('chrome-extension://')
     || origin.startsWith('edge-extension://')
     || origin === 'http://localhost'
-    || origin.startsWith('http://localhost:');
+    || origin.startsWith('http://localhost:')
+    || origin === 'http://127.0.0.1'
+    || origin.startsWith('http://127.0.0.1:');
 
   if (!allowed) return false;
   if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  // Harmless for modern LNA and required by older PNA-style Chromium checks.
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
   return true;
 }
 
@@ -51,14 +57,14 @@ function getProvider(id) {
   return provider;
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res) {
   if (!cors(req, res)) return json(res, 403, { error: 'Origin non autorisée.' });
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     return res.end();
   }
 
-  const url = new URL(req.url || '/', `http://${HOST}:${PORT}`);
+  const url = new URL(req.url || '/', `http://127.0.0.1:${PORT}`);
 
   try {
     if (req.method === 'GET' && url.pathname === '/health') {
@@ -67,6 +73,7 @@ const server = http.createServer(async (req, res) => {
         version: VERSION,
         pid: process.pid,
         providers: [...providers.keys()],
+        loopback: LOOPBACK_HOSTS,
       });
     }
 
@@ -114,11 +121,32 @@ const server = http.createServer(async (req, res) => {
     console.error(error);
     return json(res, 500, { error: error.message || String(error) });
   }
-});
+}
 
-server.listen(PORT, HOST, () => {
-  console.log(`Professor Ask bridge v${VERSION}: http://${HOST}:${PORT}`);
-  console.log(`PID: ${process.pid}`);
-  console.log('Auto-reload: actif (Node watch mode).');
-  console.log('Providers: Codex OAuth ChatGPT + Google Antigravity OAuth.');
-});
+function listen(host, { required = false } = {}) {
+  const server = http.createServer(handleRequest);
+
+  server.on('error', error => {
+    if (!required) {
+      console.warn(`[Professor Ask] Loopback ${host} indisponible: ${error.message}`);
+      return;
+    }
+    console.error(`[Professor Ask] Impossible d'ecouter sur ${host}:${PORT}: ${error.message}`);
+    process.exitCode = 1;
+  });
+
+  server.listen(PORT, host, () => {
+    const label = host.includes(':') ? `[${host}]` : host;
+    console.log(`[Professor Ask] Listening: http://${label}:${PORT}`);
+  });
+
+  return server;
+}
+
+listen('127.0.0.1', { required: true });
+listen('::1');
+
+console.log(`Professor Ask bridge v${VERSION}`);
+console.log(`PID: ${process.pid}`);
+console.log('Auto-reload: gere par bridge/watch.js.');
+console.log('Providers: Codex OAuth ChatGPT + Google Antigravity OAuth.');
