@@ -1,10 +1,10 @@
 {
   "name": "professor-ask-bridge",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --watch-path=. --watch-preserve-output server.js",
+    "start": "node watch.js",
     "start:once": "node server.js"
   },
   "engines": {
