@@ -1,15 +1,24 @@
 $ErrorActionPreference = 'Stop'
 
 $HostName = 'com.professorask.bridge'
+$InstallVersion = '0.5.1'
 $StableExtensionId = 'geibmmecfgilkhncpcjjldbidnejflfb'
 $BaseDir = $PSScriptRoot
 $RepoRoot = Split-Path $BaseDir -Parent
 $ExtensionPath = [System.IO.Path]::GetFullPath((Join-Path $RepoRoot 'extension'))
-$StatusFile = Join-Path $BaseDir 'install-status.txt'
+$HostScript = Join-Path $BaseDir 'host.js'
 $LauncherSource = Join-Path $BaseDir 'launcher.cs'
-$LauncherExe = Join-Path $BaseDir 'ProfessorAskNativeHost.exe'
-$NodePathFile = Join-Path $BaseDir 'node-path.txt'
-$ManifestPath = Join-Path $BaseDir "$HostName.json"
+$StatusFile = Join-Path $BaseDir 'install-status.txt'
+
+# Native Messaging executables should not live in the Git working tree. Apart from
+# avoiding locked-file errors during git pull/install, this gives Chrome a stable,
+# user-writable location that does not require administrator privileges.
+$InstallRoot = Join-Path $env:LOCALAPPDATA 'ProfessorAsk\NativeHost'
+$InstallDir = Join-Path $InstallRoot $InstallVersion
+$ManifestPath = Join-Path $InstallRoot "$HostName.json"
+$NodePathFile = Join-Path $InstallDir 'node-path.txt'
+$HostPathFile = Join-Path $InstallDir 'host-path.txt'
+$LauncherExe = Join-Path $InstallDir ("ProfessorAskNativeHost-" + [Guid]::NewGuid().ToString('N') + '.exe')
 
 function Write-Status([string]$Kind, [string]$Message) {
   [System.IO.File]::WriteAllText($StatusFile, "$Kind`r`n$Message", (New-Object System.Text.UTF8Encoding($false)))
@@ -54,7 +63,7 @@ function Find-UnpackedExtensionIds([string]$UserDataRoot, [string]$ExpectedPath)
     }
     catch {
       # Chrome can rewrite Preferences while the installer is reading it.
-      # Stable manifest ID remains available even if discovery fails.
+      # The stable manifest key still provides the production extension ID.
     }
   }
 
@@ -66,21 +75,23 @@ try {
     throw 'launcher.cs est introuvable.'
   }
 
-  if (-not (Test-Path (Join-Path $BaseDir 'host.js'))) {
+  if (-not (Test-Path $HostScript)) {
     throw 'host.js est introuvable.'
   }
 
   $node = Get-Command node.exe -ErrorAction SilentlyContinue
   if (-not $node) {
-    throw 'Node.js est requis pour cette version de développement du companion. Installe Node.js puis relance cet installateur.'
+    throw 'Node.js est requis pour cette version de développement du companion.'
   }
+
+  New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+  New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
   [System.IO.File]::WriteAllText($NodePathFile, $node.Source, (New-Object System.Text.UTF8Encoding($false)))
+  [System.IO.File]::WriteAllText($HostPathFile, $HostScript, (New-Object System.Text.UTF8Encoding($false)))
 
-  if (Test-Path $LauncherExe) {
-    Remove-Item $LauncherExe -Force
-  }
-
+  # Compile to a unique file. A running Native Messaging process can lock its EXE;
+  # using a new name means reinstall/update never has to overwrite that process.
   $source = Get-Content $LauncherSource -Raw
   Add-Type -TypeDefinition $source -Language CSharp -OutputAssembly $LauncherExe -OutputType ConsoleApplication
 
@@ -125,7 +136,7 @@ try {
   }
 
   $idsText = ($extensionIds -join ', ')
-  Write-Status 'OK' "Professor Ask Companion est installé. Chrome et Edge peuvent maintenant le lancer automatiquement. Aucun bridge, port ou terminal n'a besoin de rester ouvert. Extension(s) autorisée(s) : $idsText"
+  Write-Status 'OK' "Professor Ask Companion est installé. À partir de maintenant, clique simplement sur Se connecter dans l'extension : Chrome lance le companion automatiquement et le fournisseur ouvre son OAuth dans le navigateur. Aucun terminal à ouvrir. Extension(s) autorisée(s) : $idsText"
   exit 0
 }
 catch {
