@@ -12,6 +12,10 @@
     panelSize: 'standard',
     rememberHistory: true,
     historyLimit: 30,
+    geminiAuthMode: 'vertex',
+    geminiProject: '',
+    geminiLocation: 'global',
+    geminiModel: 'gemini-3.8-flash',
   };
 
   const state = {
@@ -62,6 +66,10 @@
     return video ? video.currentTime || 0 : 0;
   }
 
+  function providerName() {
+    return state.settings.provider === 'gemini' ? 'Gemini' : 'Codex';
+  }
+
   async function loadSettings() {
     const saved = await chrome.storage.sync.get(DEFAULTS);
     state.settings = { ...DEFAULTS, ...saved };
@@ -80,19 +88,17 @@
     root.classList.add(`pa-size-${state.settings.panelSize || 'standard'}`);
   }
 
-  async function fetchAccount() {
-    if (state.settings.provider !== 'codex') {
-      state.connected = false;
-      state.account = null;
-      renderStatus();
-      return;
-    }
-
+  async function fetchProviderStatus() {
     try {
-      const response = await bridgeFetch('/account');
+      let response;
+      if (state.settings.provider === 'gemini') {
+        response = await bridgeFetch(`/gemini/status?mode=${encodeURIComponent(state.settings.geminiAuthMode || 'vertex')}`);
+      } else {
+        response = await bridgeFetch('/account');
+      }
       const data = response.data || {};
       state.connected = !!(response.ok && data.connected);
-      state.account = data.account || null;
+      state.account = data.account || data || null;
     } catch {
       state.connected = false;
       state.account = null;
@@ -115,18 +121,13 @@
   function renderStatus() {
     const status = qs('#pa-status');
     const provider = qs('#pa-provider');
-    if (provider) provider.textContent = state.settings.provider === 'gemini' ? 'Gemini' : 'Codex';
+    if (provider) provider.textContent = providerName();
     if (!status) return;
 
-    if (state.settings.provider === 'gemini') {
-      status.innerHTML = '<span class="pa-dot warn"></span><span>Gemini à configurer</span>';
-      return;
-    }
-
     if (state.connected) {
-      status.innerHTML = '<span class="pa-dot ok"></span><span>Codex connecté</span>';
+      status.innerHTML = `<span class="pa-dot ok"></span><span>${providerName()} connecté</span>`;
     } else {
-      status.innerHTML = '<span class="pa-dot warn"></span><span>Codex hors ligne</span>';
+      status.innerHTML = `<span class="pa-dot warn"></span><span>${providerName()} hors ligne</span>`;
     }
   }
 
@@ -173,7 +174,7 @@
 
     applyAppearance();
     loadHistory();
-    fetchAccount();
+    fetchProviderStatus();
   }
 
   function addMessage(role, text, meta = '') {
@@ -253,6 +254,14 @@
     return state.transcript.filter(x => x.start <= end && (x.start + x.duration) >= start);
   }
 
+  function formatAnswer(answer, sources) {
+    let text = answer || '(Réponse vide)';
+    if (Array.isArray(sources) && sources.length) {
+      text += '\n\nSources :\n' + sources.slice(0, 6).map(source => `• ${source.title || source.url} — ${source.url}`).join('\n');
+    }
+    return text;
+  }
+
   async function sendQuestion() {
     if (state.busy) return;
     const input = qs('#pa-input');
@@ -260,13 +269,8 @@
     const question = input?.value.trim();
     if (!question) return;
 
-    if (state.settings.provider === 'gemini') {
-      addMessage('error', 'Gemini est sélectionné, mais son connecteur chat n’est pas encore branché. Ouvre les paramètres pour changer de fournisseur.');
-      return;
-    }
-
     if (!state.connected) {
-      addMessage('error', 'Codex n’est pas connecté. Ouvre les paramètres de Professor Ask pour lancer la connexion.');
+      addMessage('error', `${providerName()} n’est pas connecté. Ouvre les paramètres de Professor Ask pour configurer le fournisseur.`);
       return;
     }
 
@@ -278,7 +282,7 @@
     input.value = '';
     state.busy = true;
     send.disabled = true;
-    const placeholder = addMessage('assistant', 'Réflexion…', 'Codex');
+    const placeholder = addMessage('assistant', 'Réflexion…', providerName());
 
     try {
       const includeMetadata = !!state.settings.includeMetadata;
@@ -302,13 +306,17 @@
             responseLanguage: state.settings.responseLanguage,
             responseStyle: state.settings.responseStyle,
             webSearch: state.settings.webSearch,
+            geminiAuthMode: state.settings.geminiAuthMode,
+            geminiProject: state.settings.geminiProject,
+            geminiLocation: state.settings.geminiLocation,
+            geminiModel: state.settings.geminiModel,
           },
         },
       });
 
       const data = response.data || {};
-      if (!response.ok) throw new Error(response.error || data.error || 'Erreur Codex');
-      placeholder.lastElementChild.textContent = data.answer || '(Réponse vide)';
+      if (!response.ok) throw new Error(response.error || data.error || `Erreur ${providerName()}`);
+      placeholder.lastElementChild.textContent = formatAnswer(data.answer, data.sources);
       await saveHistory();
     } catch (e) {
       placeholder.remove();
@@ -374,7 +382,7 @@
     await loadSettings();
     await loadHistory();
     await loadTranscript();
-    await fetchAccount();
+    await fetchProviderStatus();
   }
 
   chrome.storage.onChanged.addListener(async (changes, area) => {
@@ -387,7 +395,7 @@
     renderStatus();
     await loadHistory();
     if (previousTranscriptLanguage !== state.settings.transcriptLanguage) await loadTranscript();
-    await fetchAccount();
+    await fetchProviderStatus();
   });
 
   setInterval(() => {
@@ -402,7 +410,7 @@
   }, 500);
 
   setInterval(() => {
-    if (getVideoId()) fetchAccount();
+    if (getVideoId()) fetchProviderStatus();
   }, 15000);
 
   setTimeout(onVideoChanged, 800);
