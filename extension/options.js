@@ -1,6 +1,9 @@
 (() => {
   const DEFAULTS = {
     provider: 'codex',
+    codexModel: 'auto',
+    codexEffort: 'auto',
+    antigravityModel: 'auto',
     responseLanguage: 'auto',
     responseStyle: 'balanced',
     webSearch: 'auto',
@@ -12,15 +15,12 @@
     panelSize: 'standard',
     rememberHistory: true,
     historyLimit: 30,
-    geminiAuthMode: 'vertex',
-    geminiProject: '',
-    geminiLocation: 'global',
-    geminiModel: 'gemini-3.8-flash',
   };
 
   const $ = id => document.getElementById(id);
   let settings = { ...DEFAULTS };
   let saveTimer = null;
+  const modelCatalogs = { codex: [], antigravity: [] };
 
   function bridgeFetch(path, { method = 'GET', body } = {}) {
     return new Promise((resolve, reject) => {
@@ -41,6 +41,16 @@
     });
   }
 
+  function openExternal(url) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: 'OPEN_EXTERNAL', url }, response => {
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        if (!response?.ok) return reject(new Error(response?.error || 'Impossible d’ouvrir le lien.'));
+        resolve();
+      });
+    });
+  }
+
   function setSaveState(text, kind = '') {
     const el = $('save-state');
     el.textContent = text;
@@ -50,23 +60,18 @@
   function setProviderPanels() {
     const provider = settings.provider || 'codex';
     $('codex-panel').hidden = provider !== 'codex';
-    $('gemini-panel').hidden = provider !== 'gemini';
+    $('antigravity-panel').hidden = provider !== 'antigravity';
     document.querySelectorAll('[data-provider-card]').forEach(card => {
       card.classList.toggle('selected', card.dataset.providerCard === provider);
     });
-    setGeminiAuthPanel();
-  }
-
-  function setGeminiAuthPanel() {
-    const mode = settings.geminiAuthMode || 'vertex';
-    $('gemini-vertex-fields').hidden = mode !== 'vertex';
-    $('gemini-api-fields').hidden = mode !== 'apiKey';
   }
 
   function readForm() {
-    const provider = document.querySelector('input[name="provider"]:checked')?.value || 'codex';
     return {
-      provider,
+      provider: document.querySelector('input[name="provider"]:checked')?.value || 'codex',
+      codexModel: $('codex-model').value || 'auto',
+      codexEffort: $('codex-effort').value || 'auto',
+      antigravityModel: $('antigravity-model').value || 'auto',
       responseLanguage: $('response-language').value,
       responseStyle: $('response-style').value,
       webSearch: $('web-search').value,
@@ -78,10 +83,6 @@
       panelSize: $('panel-size').value,
       rememberHistory: $('remember-history').checked,
       historyLimit: Number($('history-limit').value),
-      geminiAuthMode: $('gemini-auth-mode').value,
-      geminiProject: $('gemini-project').value.trim(),
-      geminiLocation: $('gemini-location').value.trim() || 'global',
-      geminiModel: $('gemini-model').value,
     };
   }
 
@@ -89,6 +90,7 @@
     settings = { ...DEFAULTS, ...value };
     const providerInput = document.querySelector(`input[name="provider"][value="${settings.provider}"]`);
     if (providerInput) providerInput.checked = true;
+
     $('response-language').value = settings.responseLanguage;
     $('response-style').value = settings.responseStyle;
     $('web-search').value = settings.webSearch;
@@ -100,10 +102,6 @@
     $('panel-size').value = settings.panelSize;
     $('remember-history').checked = !!settings.rememberHistory;
     $('history-limit').value = String(settings.historyLimit);
-    $('gemini-auth-mode').value = settings.geminiAuthMode;
-    $('gemini-project').value = settings.geminiProject;
-    $('gemini-location').value = settings.geminiLocation;
-    $('gemini-model').value = settings.geminiModel;
     setProviderPanels();
   }
 
@@ -114,7 +112,7 @@
   }
 
   function scheduleSave() {
-    settings = readForm();
+    settings = { ...settings, ...readForm() };
     setProviderPanels();
     setSaveState('Enregistrement…', 'dirty');
     clearTimeout(saveTimer);
@@ -124,137 +122,147 @@
     }, 180);
   }
 
-  async function refreshCodex() {
-    const status = $('codex-status');
-    const button = $('connect-codex');
-    status.textContent = 'Vérification…';
-    status.className = 'provider-status muted';
-    try {
-      const response = await bridgeFetch('/account');
-      const data = response.data || {};
-      if (response.ok && data.connected) {
-        const email = data.account?.email ? ` · ${data.account.email}` : '';
-        const plan = data.account?.plan_type ? ` · ${data.account.plan_type}` : '';
-        status.textContent = `Connecté${email}${plan}`;
-        status.className = 'provider-status';
-        button.textContent = 'ChatGPT connecté';
-        button.disabled = true;
-      } else {
-        status.textContent = data.bridgeError ? 'Bridge/Codex indisponible' : 'Non connecté';
-        status.className = 'provider-status warn';
-        button.textContent = 'Se connecter avec ChatGPT';
-        button.disabled = false;
-      }
-    } catch {
-      status.textContent = 'Bridge local hors ligne';
-      status.className = 'provider-status warn';
-      button.textContent = 'Se connecter avec ChatGPT';
-      button.disabled = false;
+  function setProviderStatus(provider, text, kind = 'muted') {
+    const el = $(`${provider}-status`);
+    el.textContent = text;
+    el.className = `provider-status ${kind}`.trim();
+  }
+
+  function populateModels(provider, models) {
+    modelCatalogs[provider] = Array.isArray(models) ? models : [];
+    const select = $(provider === 'codex' ? 'codex-model' : 'antigravity-model');
+    const savedValue = provider === 'codex' ? settings.codexModel : settings.antigravityModel;
+    select.innerHTML = '<option value="auto">Automatique</option>';
+
+    for (const model of modelCatalogs[provider]) {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = model.label || model.id;
+      select.appendChild(option);
+    }
+
+    if ([...select.options].some(option => option.value === savedValue)) {
+      select.value = savedValue;
+    } else {
+      select.value = 'auto';
+    }
+
+    if (provider === 'codex') updateCodexEfforts();
+  }
+
+  function updateCodexEfforts() {
+    const modelId = $('codex-model').value;
+    const effortSelect = $('codex-effort');
+    const model = modelCatalogs.codex.find(item => item.id === modelId);
+    const efforts = model?.efforts || [];
+    const preferred = settings.codexEffort || 'auto';
+
+    effortSelect.innerHTML = '<option value="auto">Automatique</option>';
+    for (const effort of efforts) {
+      const option = document.createElement('option');
+      option.value = effort;
+      option.textContent = effort.charAt(0).toUpperCase() + effort.slice(1);
+      effortSelect.appendChild(option);
+    }
+
+    if ([...effortSelect.options].some(option => option.value === preferred)) {
+      effortSelect.value = preferred;
+    } else {
+      effortSelect.value = 'auto';
     }
   }
 
-  async function connectCodex() {
-    const button = $('connect-codex');
-    const status = $('codex-status');
+  async function loadModels(provider) {
+    const response = await bridgeFetch(`/providers/${provider}/models`);
+    if (!response.ok) throw new Error(response.error || response.data?.error || 'Impossible de charger les modèles.');
+    populateModels(provider, response.data?.models || []);
+  }
+
+  async function refreshProvider(provider, { withModels = true } = {}) {
+    setProviderStatus(provider, 'Vérification…', 'muted');
+    const response = await bridgeFetch(`/providers/${provider}/status`).catch(error => ({ ok: false, error: error.message }));
+    const data = response?.data || {};
+
+    if (!response?.ok) {
+      setProviderStatus(provider, response?.error || 'Bridge local hors ligne', 'warn');
+      return false;
+    }
+
+    if (!data.installed) {
+      setProviderStatus(provider, provider === 'codex' ? 'Codex CLI non installé' : 'Antigravity CLI non installé', 'warn');
+      return false;
+    }
+
+    if (!data.connected) {
+      setProviderStatus(provider, 'Non connecté', 'warn');
+      return false;
+    }
+
+    if (provider === 'codex') {
+      const email = data.account?.email ? ` · ${data.account.email}` : '';
+      const plan = data.account?.plan_type || data.account?.planType;
+      setProviderStatus(provider, `Connecté${email}${plan ? ` · ${plan}` : ''}`, '');
+    } else {
+      setProviderStatus(provider, 'Compte Google Antigravity connecté', '');
+    }
+
+    if (withModels) {
+      try {
+        await loadModels(provider);
+      } catch (error) {
+        setProviderStatus(provider, `Connecté · modèles indisponibles : ${error.message}`, 'warn');
+      }
+    }
+    return true;
+  }
+
+  async function connectProvider(provider) {
+    const button = $(`connect-${provider}`);
     button.disabled = true;
-    button.textContent = 'Ouverture OAuth…';
-    try {
-      const response = await bridgeFetch('/login', { method: 'POST' });
-      const data = response.data || {};
-      if (!response.ok) throw new Error(response.error || data.error || 'Connexion Codex impossible.');
-      if (data.connected) {
-        await refreshCodex();
-        return;
-      }
-      if (!data.authUrl) throw new Error('Codex n’a pas renvoyé de lien OAuth ChatGPT.');
-      await chrome.tabs.create({ url: data.authUrl });
-      status.textContent = 'OAuth ChatGPT ouvert dans un nouvel onglet…';
-      status.className = 'provider-status warn';
-      for (let i = 0; i < 120; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const account = await bridgeFetch('/account').catch(() => null);
-        if (account?.ok && account.data?.connected) break;
-      }
-      await refreshCodex();
-    } catch (error) {
-      status.textContent = error.message;
-      status.className = 'provider-status warn';
-      button.disabled = false;
-      button.textContent = 'Se connecter avec ChatGPT';
-    }
-  }
+    button.textContent = provider === 'codex' ? 'Ouverture ChatGPT…' : 'Ouverture Antigravity…';
+    setProviderStatus(provider, 'Démarrage de la connexion…', 'warn');
 
-  async function refreshGemini() {
-    settings = readForm();
-    const status = $('gemini-status');
-    status.textContent = 'Vérification…';
-    status.className = 'provider-status muted';
     try {
-      const response = await bridgeFetch(`/gemini/status?mode=${encodeURIComponent(settings.geminiAuthMode)}`);
+      const response = await bridgeFetch(`/providers/${provider}/login`, { method: 'POST' });
       const data = response.data || {};
-      if (response.ok && data.connected) {
-        if (settings.geminiAuthMode === 'vertex') {
-          status.textContent = data.email ? `Google connecté · ${data.email}` : 'Google Cloud OAuth connecté';
-        } else {
-          status.textContent = 'Clé Gemini API configurée';
+      if (!response.ok) throw new Error(response.error || data.error || 'Impossible de lancer la connexion.');
+
+      if (provider === 'codex' && data.authUrl && !data.opened) {
+        await openExternal(data.authUrl);
+      }
+
+      setProviderStatus(
+        provider,
+        provider === 'codex'
+          ? 'Connexion ChatGPT ouverte dans le navigateur…'
+          : 'Antigravity ouvert. Termine le Google OAuth dans le navigateur…',
+        'warn',
+      );
+
+      for (let i = 0; i < 60; i++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const connected = await refreshProvider(provider, { withModels: false });
+        if (connected) {
+          await loadModels(provider).catch(() => {});
+          break;
         }
-        status.className = 'provider-status';
-      } else {
-        status.textContent = settings.geminiAuthMode === 'vertex'
-          ? (data.error ? 'Google Cloud OAuth non connecté' : 'Google Cloud OAuth non connecté')
-          : 'Clé Gemini API non configurée';
-        status.className = 'provider-status warn';
       }
-    } catch {
-      status.textContent = 'Bridge local hors ligne';
-      status.className = 'provider-status warn';
-    }
-  }
-
-  async function connectGeminiGoogle() {
-    const button = $('connect-gemini-google');
-    const status = $('gemini-status');
-    button.disabled = true;
-    button.textContent = 'Ouverture OAuth…';
-    try {
-      const response = await bridgeFetch('/gemini/login', { method: 'POST' });
-      if (!response.ok) throw new Error(response.error || response.data?.error || 'Connexion Google impossible.');
-      status.textContent = 'Connexion Google ouverte dans le navigateur…';
-      status.className = 'provider-status warn';
-      for (let i = 0; i < 120; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const check = await bridgeFetch('/gemini/status?mode=vertex').catch(() => null);
-        if (check?.ok && check.data?.connected) break;
-      }
-      await refreshGemini();
     } catch (error) {
-      status.textContent = error.message;
-      status.className = 'provider-status warn';
+      setProviderStatus(provider, error.message, 'warn');
     } finally {
       button.disabled = false;
-      button.textContent = 'Se connecter avec Google';
+      button.textContent = provider === 'codex' ? 'Se connecter avec ChatGPT' : 'Se connecter avec Google';
     }
   }
 
-  async function saveGeminiApiKey(clear = false) {
-    const input = $('gemini-api-key');
-    const key = clear ? '' : input.value.trim();
-    if (!clear && !key) {
-      $('gemini-status').textContent = 'Colle une clé Gemini API avant de l’enregistrer.';
-      $('gemini-status').className = 'provider-status warn';
-      return;
-    }
-    const response = await bridgeFetch('/gemini/api-key', {
-      method: 'POST',
-      body: { apiKey: key },
-    });
+  async function logoutProvider(provider) {
+    const response = await bridgeFetch(`/providers/${provider}/logout`, { method: 'POST' });
     if (!response.ok) {
-      $('gemini-status').textContent = response.error || 'Impossible d’enregistrer la clé.';
-      $('gemini-status').className = 'provider-status warn';
+      setProviderStatus(provider, response.error || response.data?.error || 'Déconnexion impossible.', 'warn');
       return;
     }
-    input.value = '';
-    await refreshGemini();
+    populateModels(provider, []);
+    setProviderStatus(provider, 'Déconnecté', 'warn');
   }
 
   async function clearHistory() {
@@ -268,33 +276,40 @@
   }
 
   async function resetSettings() {
-    writeForm(DEFAULTS);
-    await chrome.storage.sync.set(DEFAULTS);
+    settings = { ...DEFAULTS };
+    writeForm(settings);
+    populateModels('codex', modelCatalogs.codex);
+    populateModels('antigravity', modelCatalogs.antigravity);
+    await chrome.storage.sync.set(settings);
     setSaveState('Paramètres réinitialisés', 'ok');
-    await refreshGemini();
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
     await loadSettings();
-    await Promise.all([refreshCodex(), refreshGemini()]);
+    await Promise.all([
+      refreshProvider('codex').catch(() => false),
+      refreshProvider('antigravity').catch(() => false),
+    ]);
 
     document.querySelectorAll('select, input[type="checkbox"], input[name="provider"]').forEach(control => {
-      control.addEventListener('change', async () => {
+      control.addEventListener('change', () => {
+        if (control.id === 'codex-model') {
+          settings.codexModel = control.value;
+          updateCodexEfforts();
+        }
         scheduleSave();
-        if (control.id === 'gemini-auth-mode') await refreshGemini();
       });
     });
-    $('gemini-project').addEventListener('input', scheduleSave);
-    $('gemini-location').addEventListener('input', scheduleSave);
 
-    $('connect-codex').addEventListener('click', connectCodex);
-    $('refresh-codex').addEventListener('click', refreshCodex);
-    $('connect-gemini-google').addEventListener('click', connectGeminiGoogle);
-    $('refresh-gemini').addEventListener('click', refreshGemini);
-    $('save-gemini-api-key').addEventListener('click', () => saveGeminiApiKey(false));
-    $('clear-gemini-api-key').addEventListener('click', () => saveGeminiApiKey(true));
-    $('open-google-cloud').addEventListener('click', () => chrome.tabs.create({ url: 'https://console.cloud.google.com/' }));
-    $('open-ai-studio').addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/apikey' }));
+    $('connect-codex').addEventListener('click', () => connectProvider('codex'));
+    $('refresh-codex').addEventListener('click', () => refreshProvider('codex'));
+    $('logout-codex').addEventListener('click', () => logoutProvider('codex'));
+
+    $('connect-antigravity').addEventListener('click', () => connectProvider('antigravity'));
+    $('refresh-antigravity').addEventListener('click', () => refreshProvider('antigravity'));
+    $('logout-antigravity').addEventListener('click', () => logoutProvider('antigravity'));
+    $('open-antigravity-docs').addEventListener('click', () => openExternal('https://antigravity.google/docs/cli/install/'));
+
     $('clear-history').addEventListener('click', clearHistory);
     $('reset-settings').addEventListener('click', resetSettings);
   });
