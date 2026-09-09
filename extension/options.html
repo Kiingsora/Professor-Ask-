@@ -54,7 +54,7 @@
       <div class="connection-panel connection-stack" id="codex-panel">
         <div class="connection-copy">
           <strong>Compte ChatGPT / Codex</strong>
-          <p>Professor Ask demande à <code>codex app-server</code> de lancer le flux OAuth officiel. Le bridge ouvre lui-même le navigateur et Codex conserve la session.</p>
+          <p>Professor Ask demande à Codex de démarrer son OAuth officiel, puis ouvre directement la page de connexion dans un nouvel onglet Chrome. Les identifiants restent gérés par Codex.</p>
         </div>
 
         <div class="connection-actions">
@@ -69,7 +69,7 @@
             <select id="codex-model">
               <option value="auto">Automatique</option>
             </select>
-            <small>La liste est récupérée directement depuis <code>model/list</code> pour ton compte.</small>
+            <small>La liste est récupérée directement depuis Codex pour ton compte.</small>
           </label>
 
           <label class="field">
@@ -85,14 +85,14 @@
       <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
         <div class="connection-copy">
           <strong>Compte Google Antigravity</strong>
-          <p>Professor Ask utilise le CLI officiel <code>agy</code>. Au premier lancement, Antigravity ouvre automatiquement le navigateur pour le Google OAuth puis conserve la session dans le gestionnaire d’identifiants Windows.</p>
+          <p>Professor Ask utilise le client officiel Antigravity. S’il n’existe aucune session enregistrée, Antigravity déclenche son OAuth Google dans le navigateur et conserve la session dans le gestionnaire d’identifiants Windows.</p>
         </div>
 
         <div class="connection-actions">
           <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
           <button class="button" id="refresh-antigravity">Actualiser</button>
           <button class="button" id="logout-antigravity">Déconnecter</button>
-          <button class="button" id="open-antigravity-docs">Installer / documentation</button>
+          <button class="button" id="open-antigravity-docs">Installer Antigravity</button>
         </div>
 
         <div class="settings-grid full-grid provider-model-grid">
@@ -101,7 +101,7 @@
             <select id="antigravity-model">
               <option value="auto">Automatique</option>
             </select>
-            <small>La liste vient de <code>agy models</code> et peut inclure Gemini, Claude et d’autres modèles accessibles à ton forfait.</small>
+            <small>La liste vient d’Antigravity et peut inclure Gemini, Claude et les autres modèles accessibles à ton compte.</small>
           </label>
         </div>
       </div>
@@ -254,12 +254,11 @@
     </section>
 
     <footer class="footer-note">
-      <span>Bridge : <code>127.0.0.1 / localhost : 43119</code></span>
-      <span>Professor Ask v0.4.2</span>
+      <span>Transport : <code>Chrome Native Messaging</code></span>
+      <span>Professor Ask v0.5.1</span>
     </footer>
   </main>
 
-  <script src="loopback.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
