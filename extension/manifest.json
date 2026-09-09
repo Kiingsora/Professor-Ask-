@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Professor Ask",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Discuss YouTube videos with an AI using timestamped transcript context.",
   "permissions": ["storage"],
   "host_permissions": [
