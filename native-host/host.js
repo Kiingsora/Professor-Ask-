@@ -1,7 +1,7 @@
 import { CodexProvider } from '../bridge/providers/codex.js';
 import { AntigravityProvider } from '../bridge/providers/antigravity.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 const MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
 
 const providers = new Map([
