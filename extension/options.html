@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">Professor Ask</p>
         <h1>Paramètres</h1>
-        <p class="lede">Configure le fournisseur IA, la connexion au compte, le contexte vidéo et le comportement des réponses.</p>
+        <p class="lede">Connecte ton fournisseur, choisis le modèle utilisé et règle le contexte envoyé depuis YouTube.</p>
       </div>
       <div class="save-state" id="save-state">Enregistré</div>
     </header>
@@ -21,7 +21,7 @@
       <div class="section-heading">
         <div>
           <h2>Fournisseur IA</h2>
-          <p>Choisis le moteur qui répondra dans le panneau YouTube.</p>
+          <p>Chaque fournisseur gère sa propre authentification et expose les modèles disponibles sur ton compte.</p>
         </div>
       </div>
 
@@ -32,93 +32,77 @@
             <div class="provider-icon">C</div>
             <div>
               <strong>Codex</strong>
-              <span>Compte ChatGPT / Codex</span>
+              <span>OAuth ChatGPT / compte Codex</span>
             </div>
           </div>
-          <div class="provider-status" id="codex-status">Vérification…</div>
+          <div class="provider-status muted" id="codex-status">Vérification…</div>
         </label>
 
-        <label class="provider-card" data-provider-card="gemini">
-          <input type="radio" name="provider" value="gemini" />
+        <label class="provider-card" data-provider-card="antigravity">
+          <input type="radio" name="provider" value="antigravity" />
           <div class="provider-card-main">
-            <div class="provider-icon">G</div>
+            <div class="provider-icon">A</div>
             <div>
-              <strong>Gemini</strong>
-              <span>Google Cloud OAuth ou Gemini API</span>
+              <strong>Antigravity</strong>
+              <span>OAuth Google / compte Antigravity</span>
             </div>
           </div>
-          <div class="provider-status muted" id="gemini-status">Vérification…</div>
+          <div class="provider-status muted" id="antigravity-status">Vérification…</div>
         </label>
       </div>
 
-      <div class="connection-panel" id="codex-panel">
-        <div>
-          <strong>Connexion Codex avec ChatGPT</strong>
-          <p>Le bouton lance le flux OAuth officiel de Codex. Le navigateur s’ouvre sur ChatGPT, puis Codex conserve et renouvelle lui-même la session. Professor Ask ne reçoit pas le token OAuth.</p>
+      <div class="connection-panel connection-stack" id="codex-panel">
+        <div class="connection-copy">
+          <strong>Compte ChatGPT / Codex</strong>
+          <p>Professor Ask demande à <code>codex app-server</code> de lancer le flux OAuth officiel. Le bridge ouvre lui-même le navigateur et Codex conserve la session.</p>
         </div>
+
         <div class="connection-actions">
           <button class="button primary" id="connect-codex">Se connecter avec ChatGPT</button>
           <button class="button" id="refresh-codex">Actualiser</button>
+          <button class="button" id="logout-codex">Déconnecter</button>
+        </div>
+
+        <div class="settings-grid full-grid provider-model-grid">
+          <label class="field">
+            <span>Modèle Codex</span>
+            <select id="codex-model">
+              <option value="auto">Automatique</option>
+            </select>
+            <small>La liste est récupérée directement depuis <code>model/list</code> pour ton compte.</small>
+          </label>
+
+          <label class="field">
+            <span>Effort de raisonnement</span>
+            <select id="codex-effort">
+              <option value="auto">Automatique</option>
+            </select>
+            <small>Les niveaux affichés dépendent du modèle sélectionné.</small>
+          </label>
         </div>
       </div>
 
-      <div class="connection-panel connection-stack" id="gemini-panel" hidden>
+      <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
         <div class="connection-copy">
-          <strong>Connexion Gemini</strong>
-          <p>Pour une application tierce, Professor Ask utilise soit Google Cloud OAuth avec Vertex AI, soit la Gemini API. L’OAuth interne du Gemini CLI grand public n’est pas réutilisé.</p>
+          <strong>Compte Google Antigravity</strong>
+          <p>Professor Ask utilise le CLI officiel <code>agy</code>. Au premier lancement, Antigravity ouvre automatiquement le navigateur pour le Google OAuth puis conserve la session dans le gestionnaire d’identifiants Windows.</p>
         </div>
 
-        <div class="settings-grid full-grid">
+        <div class="connection-actions">
+          <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
+          <button class="button" id="refresh-antigravity">Actualiser</button>
+          <button class="button" id="logout-antigravity">Déconnecter</button>
+          <button class="button" id="open-antigravity-docs">Installer / documentation</button>
+        </div>
+
+        <div class="settings-grid full-grid provider-model-grid">
           <label class="field">
-            <span>Méthode de connexion Gemini</span>
-            <select id="gemini-auth-mode">
-              <option value="vertex">Google OAuth — Vertex AI</option>
-              <option value="apiKey">Clé Gemini API</option>
+            <span>Modèle Antigravity</span>
+            <select id="antigravity-model">
+              <option value="auto">Automatique</option>
             </select>
+            <small>La liste vient de <code>agy models</code> et peut inclure Gemini, Claude et d’autres modèles accessibles à ton forfait.</small>
           </label>
-
-          <label class="field">
-            <span>Modèle Gemini</span>
-            <select id="gemini-model">
-              <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
-              <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
-              <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-              <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
-            </select>
-          </label>
-        </div>
-
-        <div id="gemini-vertex-fields" class="provider-config-block">
-          <div class="settings-grid full-grid">
-            <label class="field">
-              <span>Google Cloud Project ID</span>
-              <input id="gemini-project" type="text" autocomplete="off" placeholder="mon-projet-gcp" />
-            </label>
-            <label class="field">
-              <span>Région Vertex AI</span>
-              <input id="gemini-location" type="text" autocomplete="off" placeholder="global" />
-            </label>
-          </div>
-          <div class="connection-actions">
-            <button class="button primary" id="connect-gemini-google">Se connecter avec Google</button>
-            <button class="button" id="refresh-gemini">Actualiser</button>
-            <button class="button" id="open-google-cloud">Ouvrir Google Cloud</button>
-          </div>
-          <p class="provider-help">Cette connexion ouvre l’authentification Google via <code>gcloud auth application-default login</code>. Google Cloud CLI doit être installé sur la machine.</p>
-        </div>
-
-        <div id="gemini-api-fields" class="provider-config-block" hidden>
-          <label class="field secret-field">
-            <span>Clé Gemini API</span>
-            <input id="gemini-api-key" type="password" autocomplete="off" placeholder="Coller une clé Google AI Studio" />
-            <small>La clé est envoyée uniquement au bridge local et enregistrée dans un fichier ignoré par Git.</small>
-          </label>
-          <div class="connection-actions">
-            <button class="button primary" id="save-gemini-api-key">Enregistrer la clé</button>
-            <button class="button" id="clear-gemini-api-key">Supprimer la clé</button>
-            <button class="button" id="open-ai-studio">Créer/gérer une clé</button>
-          </div>
         </div>
       </div>
     </section>
@@ -162,7 +146,7 @@
         <label class="toggle-row">
           <div>
             <span>Mettre la vidéo en pause quand j’envoie une question</span>
-            <small>Évite que le contexte temporel continue de bouger pendant la réponse.</small>
+            <small>Fige le moment exact utilisé comme contexte.</small>
           </div>
           <input type="checkbox" id="pause-on-question" />
         </label>
@@ -200,7 +184,7 @@
         <label class="toggle-row">
           <div>
             <span>Inclure le titre et la chaîne</span>
-            <small>Ajoute les métadonnées de la vidéo au contexte envoyé à l’IA.</small>
+            <small>Ajoute les métadonnées de la vidéo au contexte.</small>
           </div>
           <input type="checkbox" id="include-metadata" />
         </label>
@@ -240,7 +224,7 @@
       <div class="section-heading">
         <div>
           <h2>Historique et confidentialité</h2>
-          <p>Les conversations sont stockées localement dans l’extension.</p>
+          <p>Les conversations de l’extension restent stockées localement.</p>
         </div>
       </div>
 
@@ -248,7 +232,7 @@
         <label class="toggle-row">
           <div>
             <span>Mémoriser les conversations par vidéo</span>
-            <small>Permet de retrouver la discussion quand tu reviens sur la même vidéo.</small>
+            <small>Retrouve la discussion quand tu reviens sur la vidéo.</small>
           </div>
           <input type="checkbox" id="remember-history" />
         </label>
@@ -270,8 +254,8 @@
     </section>
 
     <footer class="footer-note">
-      <span>Bridge local : <code>http://127.0.0.1:43119</code></span>
-      <span>Professor Ask v0.3</span>
+      <span>Bridge : <code>http://127.0.0.1:43119</code></span>
+      <span>Professor Ask v0.4</span>
     </footer>
   </main>
 
