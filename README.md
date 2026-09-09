@@ -2,135 +2,72 @@
 
 Professor Ask is a Chrome/Edge extension that adds an AI discussion panel next to a YouTube video.
 
-The assistant receives:
+The assistant receives the current timestamp, the timestamped transcript around that moment, optional video metadata, and the user's question.
 
-- the current video timestamp;
-- the YouTube transcript with timestamps;
-- nearby transcript context around the current playback position;
-- optional video title/channel metadata;
-- optional conversation history for the current video.
+## UX goal
 
-## Provider architecture
+The end user must not have to start a local server, keep a terminal open, manage ports, or understand the provider CLIs.
 
-Professor Ask now treats AI backends as interchangeable providers. The extension only asks a provider for four things:
-
-- connection status;
-- login/logout;
-- available models;
-- a response to the current YouTube question.
-
-Provider-specific OAuth tokens are not handled by the extension.
-
-### Codex
-
-Codex uses the user's **ChatGPT/Codex account** through the official Codex OAuth flow.
-
-Professor Ask starts `codex app-server`, calls `account/login/start` with `type: chatgpt`, and the bridge opens the returned ChatGPT OAuth URL in the default browser. Codex owns the callback, persisted credentials, refresh tokens and account session.
-
-The available model selector is populated dynamically through Codex `model/list`, including the reasoning-effort levels supported by each model.
-
-### Google Antigravity
-
-Antigravity uses the user's **Google/Antigravity account** through the official `agy` CLI.
-
-Professor Ask does not create or store a Google OAuth token. Clicking **Se connecter avec Google** launches the official Antigravity CLI. If no cached session exists, `agy` opens the default browser and runs its normal Google OAuth flow. The resulting session is stored in the operating system secure credential store used by Antigravity.
-
-The model selector is populated dynamically with `agy models`. This can expose Gemini models and any other models Antigravity makes available to the connected account.
-
-Questions are executed through Antigravity headless mode using `agy -p ... --output-format json`, and conversations are resumed per YouTube video when possible.
-
-## Architecture
+Professor Ask therefore uses **Chrome Native Messaging** instead of a localhost HTTP bridge.
 
 ```text
 YouTube page
-  -> extension/content.js
-      -> timestamp + transcript + chat UI
-      -> extension/background.js
-          -> http://127.0.0.1:43119
-              -> bridge/server.js
-                  -> providers/codex.js
-                      -> codex app-server
-                      -> ChatGPT OAuth
-                  -> providers/antigravity.js
-                      -> agy CLI
-                      -> Google OAuth / Antigravity account
+  -> Professor Ask extension
+      -> Chrome Native Messaging
+          -> Professor Ask Companion (started automatically by Chrome)
+              -> Codex provider -> codex app-server -> ChatGPT OAuth
+              -> Antigravity provider -> agy -> Google OAuth
 ```
 
-The local bridge does **not** run a local AI model and does not persist OAuth access tokens.
+There is no `127.0.0.1` port in the normal application path.
 
-## Requirements
+## One-time Windows setup
 
-Base:
+For the current development build:
 
-- Chrome or Edge (Manifest V3)
-- Node.js 20+
+1. Pull the repository.
+2. Double-click **`Installer Professor Ask.vbs`** at the repository root.
+3. A confirmation dialog appears when the companion is installed.
+4. Reload Professor Ask in `chrome://extensions` or `edge://extensions`.
 
-For Codex:
+No terminal needs to stay open after installation. Chrome starts the native companion automatically whenever the extension needs it.
 
-- Codex CLI installed and available as `codex`
+The development installer currently requires Node.js because the native launcher starts `native-host/host.js`. A packaged self-contained executable can replace that dependency for distribution later without changing the extension architecture.
 
-For Antigravity:
+## Stable extension ID
 
-- Antigravity CLI installed and available as `agy`
-
-Windows installation command from the official Antigravity documentation:
-
-```powershell
-irm https://antigravity.google/cli/install.ps1 | iex
-```
-
-## Run the bridge
-
-```bash
-cd bridge
-npm start
-```
-
-On Windows you can also run:
+The extension manifest contains a fixed public key so its unpacked extension ID remains stable:
 
 ```text
-bridge\start.bat
+geibmmecfgilkhncpcjjldbidnejflfb
 ```
 
-The bridge listens only on `127.0.0.1:43119`.
+The Windows Native Messaging host is registered only for that extension origin.
 
-## Install / reload the extension
+## Providers
 
-1. Open `chrome://extensions` or `edge://extensions`.
-2. Enable Developer mode.
-3. Load the `extension` folder if needed.
-4. After each `git pull`, click **Reload** on Professor Ask.
-5. Reload the YouTube tab.
+### Codex / ChatGPT
 
-## Connect Codex
+Codex uses the user's ChatGPT/Codex account through the official Codex app-server OAuth flow.
 
-1. Start the Professor Ask bridge.
-2. Open Professor Ask settings.
-3. Select **Codex**.
-4. Click **Se connecter avec ChatGPT**.
-5. The bridge opens the ChatGPT OAuth page in the default browser.
-6. Complete the login.
-7. Professor Ask refreshes the account state and loads the models available to that account.
+Professor Ask asks `codex app-server` to start `account/login/start` with `type: chatgpt`. Codex owns the callback, tokens, refresh flow, and persisted account session. Professor Ask never receives the OAuth token.
 
-## Connect Antigravity
+The model selector is populated dynamically with `model/list`, including the reasoning-effort levels supported by each available model.
 
-1. Install `agy` if needed.
-2. Start the Professor Ask bridge.
-3. Open Professor Ask settings.
-4. Select **Antigravity**.
-5. Click **Se connecter avec Google**.
-6. Professor Ask launches the official Antigravity CLI in a terminal.
-7. If the account is not already authenticated, Antigravity opens the browser and starts its Google OAuth flow.
-8. Complete the login and return to Professor Ask.
-9. The settings page detects the session and loads `agy models`.
+### Google Antigravity
+
+Antigravity uses the official `agy` CLI and the user's Google/Antigravity session.
+
+If no Antigravity credentials exist, Professor Ask launches the official client invisibly; Antigravity opens the default browser for Google OAuth and stores the resulting session in Windows Credential Manager. No terminal window is required by Professor Ask.
+
+The model selector is populated dynamically with `agy models`. Questions use Antigravity headless mode and can resume a conversation per YouTube video.
 
 ## Settings
 
 The options page exposes:
 
 - provider selection: Codex / Antigravity;
-- ChatGPT/Codex OAuth status, login and logout;
-- Google/Antigravity OAuth status, login and logout;
+- OAuth connection status, login and logout;
 - dynamic Codex model selection;
 - dynamic Codex reasoning-effort selection;
 - dynamic Antigravity model selection;
@@ -138,24 +75,43 @@ The options page exposes:
 - answer detail level;
 - web-search policy;
 - pause-video-on-question behavior;
-- transcript context window (±1 / ±3 / ±5 / ±10 minutes);
+- transcript context window;
 - preferred transcript language;
 - optional video title/channel metadata;
 - panel theme and height;
-- local conversation-history enable/disable and retention limit;
-- clear-history and reset-settings actions.
+- local conversation-history controls.
 
 Non-secret settings are saved with `chrome.storage.sync`. Conversation history is stored with `chrome.storage.local`.
 
-## Security notes
+## Development files
 
-- The extension never receives the ChatGPT OAuth token.
-- Codex owns and refreshes its ChatGPT session.
-- Professor Ask never receives the Google OAuth token used by Antigravity.
-- Antigravity owns its account session through its secure local credential store.
-- The bridge binds to loopback only.
-- No transcript or chat is sent anywhere except to the selected provider when the user asks a question.
+```text
+extension/
+  background.js      Native Messaging transport
+  content.js         YouTube panel + transcript context
+  options.*          settings UI
+
+native-host/
+  host.js            Native Messaging protocol + provider router
+  launcher.cs        tiny Windows stdio launcher
+  install.ps1        registration/compiler logic
+  Installer Professor Ask.vbs
+
+bridge/
+  providers/         Codex and Antigravity provider implementations
+  lib/               shared prompt/process helpers
+  server.js          legacy HTTP development bridge; not used by extension v0.5+
+```
+
+## Security
+
+- No local HTTP port is required by the extension.
+- Native Messaging restricts the companion to the fixed Professor Ask extension origin.
+- ChatGPT credentials remain owned by Codex.
+- Google/Antigravity credentials remain owned by Antigravity/Windows Credential Manager.
+- The extension never reads provider OAuth tokens.
+- Transcript/chat content is sent only to the selected provider when the user asks a question.
 
 ## TipTour reference
 
-The provider-settings organization is intentionally similar to the clean separation used by TipTour: the UI selects/configures providers while provider-specific credential logic stays outside the rest of the application. The current public TipTour source itself uses locally stored provider keys rather than the Codex/Antigravity OAuth flows used here.
+The provider separation follows the same useful design principle seen in TipTour: UI and application logic do not need to know provider-specific credential details. Each provider exposes status, authentication, model listing, and execution behind a small interface.
