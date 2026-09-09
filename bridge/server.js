@@ -10,7 +10,7 @@ class CodexClient {
     this.proc = null;
     this.nextId = 1;
     this.pending = new Map();
-    this.notificationWaiters = new Map();
+    this.listeners = new Set();
     this.ready = false;
     this.starting = null;
   }
@@ -28,7 +28,7 @@ class CodexClient {
       windowsHide: true,
     });
 
-    this.proc.on('error', (err) => this.failAll(new Error(`Impossible de lancer Codex CLI: ${err.message}`)));
+    this.proc.on('error', err => this.failAll(new Error(`Impossible de lancer Codex CLI: ${err.message}`)));
     this.proc.on('exit', (code, signal) => {
       this.ready = false;
       this.failAll(new Error(`Codex app-server arrêté (${code ?? signal ?? 'inconnu'}).`));
@@ -38,7 +38,7 @@ class CodexClient {
     rl.on('line', line => {
       line = line.trim();
       if (!line) return;
-      try { this.onMessage(JSON.parse(line)); } catch { /* Ignore non JSON output. */ }
+      try { this.onMessage(JSON.parse(line)); } catch {}
     });
 
     this.proc.stderr.on('data', chunk => {
@@ -52,9 +52,7 @@ class CodexClient {
         title: 'Professor Ask',
         version: '0.1.0',
       },
-      capabilities: {
-        experimentalApi: true,
-      },
+      capabilities: { experimentalApi: true },
     }, 15000);
 
     this.notify('initialized', {});
@@ -73,19 +71,15 @@ class CodexClient {
     }
 
     if (msg?.method) {
-      const waiters = this.notificationWaiters.get(msg.method) || [];
-      for (const waiter of [...waiters]) {
-        try {
-          if (!waiter.predicate || waiter.predicate(msg.params || {})) {
-            waiter.resolve(msg.params || {});
-            clearTimeout(waiter.timer);
-            waiters.splice(waiters.indexOf(waiter), 1);
-          }
-        } catch {}
+      for (const listener of [...this.listeners]) {
+        try { listener(msg.method, msg.params || {}); } catch {}
       }
-      if (waiters.length) this.notificationWaiters.set(msg.method, waiters);
-      else this.notificationWaiters.delete(msg.method);
     }
+  }
+
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   send(payload) {
@@ -109,34 +103,12 @@ class CodexClient {
     this.send({ method, params });
   }
 
-  waitFor(method, predicate = null, timeoutMs = 120000) {
-    return new Promise((resolve, reject) => {
-      const waiter = { predicate, resolve, reject, timer: null };
-      waiter.timer = setTimeout(() => {
-        const list = this.notificationWaiters.get(method) || [];
-        const i = list.indexOf(waiter);
-        if (i >= 0) list.splice(i, 1);
-        reject(new Error(`Timeout en attendant ${method}`));
-      }, timeoutMs);
-      const list = this.notificationWaiters.get(method) || [];
-      list.push(waiter);
-      this.notificationWaiters.set(method, list);
-    });
-  }
-
   failAll(err) {
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
       p.reject(err);
     }
     this.pending.clear();
-    for (const list of this.notificationWaiters.values()) {
-      for (const w of list) {
-        clearTimeout(w.timer);
-        w.reject(err);
-      }
-    }
-    this.notificationWaiters.clear();
   }
 }
 
@@ -154,11 +126,7 @@ function json(res, status, body) {
 
 function cors(req, res) {
   const origin = req.headers.origin || '';
-  const allowed = !origin ||
-    origin.startsWith('chrome-extension://') ||
-    origin.startsWith('edge-extension://') ||
-    origin === 'http://localhost' ||
-    origin.startsWith('http://localhost:');
+  const allowed = !origin || origin.startsWith('chrome-extension://') || origin.startsWith('edge-extension://') || origin === 'http://localhost' || origin.startsWith('http://localhost:');
   if (!allowed) return false;
   if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
@@ -183,14 +151,6 @@ async function getAccount() {
   return { connected: account?.type === 'chatgpt', account };
 }
 
-function buildPrompt(payload) {
-  const lines = (payload.transcript || []).map(seg =>
-    `[${formatTime(seg.start)}] ${String(seg.text || '').trim()}`
-  ).filter(Boolean).join('\n');
-
-  return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || 'Inconnu'}\nChaîne: ${payload.channel || 'Inconnue'}\nPosition actuelle: ${formatTime(payload.timestamp)}\n\nTRANSCRIPTION AUTOUR DU MOMENT ACTUEL\n${lines || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Prends la transcription et le timestamp comme contexte principal.\n- Explique clairement ce qui est dit ou sous-entendu autour du moment actuel.\n- Si la question nécessite des informations absentes de la vidéo, des faits récents ou une vérification, utilise la recherche web disponible dans Codex.\n- Distingue clairement ce qui vient de la vidéo de ce qui vient de sources externes.\n- Quand tu utilises le web, donne les sources ou liens pertinents dans la réponse.\n- Réponds dans la langue de l'utilisateur.\n- Ne parle pas de programmation ou de modification de fichiers sauf si la vidéo ou la question porte réellement dessus.`;
-}
-
 function formatTime(value) {
   let sec = Math.max(0, Math.floor(Number(value) || 0));
   const h = Math.floor(sec / 3600);
@@ -198,6 +158,15 @@ function formatTime(value) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function buildPrompt(payload) {
+  const transcript = (payload.transcript || [])
+    .map(seg => `[${formatTime(seg.start)}] ${String(seg.text || '').trim()}`)
+    .filter(Boolean)
+    .join('\n');
+
+  return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || 'Inconnu'}\nChaîne: ${payload.channel || 'Inconnue'}\nPosition actuelle: ${formatTime(payload.timestamp)}\n\nTRANSCRIPTION AUTOUR DU MOMENT ACTUEL\n${transcript || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Prends la transcription et le timestamp comme contexte principal.\n- Explique clairement ce qui est dit ou sous-entendu autour du moment actuel.\n- Si la question nécessite des informations absentes de la vidéo, des faits récents ou une vérification, utilise la recherche web disponible dans Codex.\n- Distingue clairement ce qui vient de la vidéo de ce qui vient de sources externes.\n- Quand tu utilises le web, donne les sources ou liens pertinents.\n- Réponds dans la langue de l'utilisateur.`;
 }
 
 async function getThread(videoId) {
@@ -215,53 +184,53 @@ async function getThread(videoId) {
 async function askCodex(payload) {
   const account = await getAccount();
   if (!account.connected) throw new Error('Compte Codex non connecté.');
+
   const threadId = await getThread(payload.videoId || 'unknown');
   const prompt = buildPrompt(payload);
-
-  const start = await codex.request('turn/start', {
-    threadId,
-    input: [{ type: 'text', text: prompt, text_elements: [] }],
-  }, 30000);
-
-  const turnId = start?.turn?.id;
-  if (!turnId) throw new Error('Codex n’a pas renvoyé de turnId.');
-
   let answer = '';
-  let done = false;
-  let failure = null;
+  let expectedTurnId = null;
+  let completedResolve;
+  let completedReject;
 
-  const deltaLoop = (async () => {
-    while (!done) {
-      try {
-        const event = await codex.waitFor(
-          'item/agentMessage/delta',
-          p => p.threadId === threadId && p.turnId === turnId,
-          120000,
-        );
-        answer += event.delta || '';
-      } catch (e) {
-        if (!done) failure = e;
-        break;
+  const completed = new Promise((resolve, reject) => {
+    completedResolve = resolve;
+    completedReject = reject;
+  });
+
+  const timeout = setTimeout(() => completedReject(new Error('Timeout pendant la réponse Codex.')), 180000);
+  const unsubscribe = codex.subscribe((method, params) => {
+    if (params.threadId !== threadId) return;
+
+    if (method === 'item/agentMessage/delta') {
+      if (!expectedTurnId || params.turnId === expectedTurnId) answer += params.delta || '';
+      return;
+    }
+
+    if (method === 'turn/completed') {
+      const id = params.turn?.id;
+      if (expectedTurnId && id !== expectedTurnId) return;
+      if (params.turn?.status === 'failed') {
+        completedReject(new Error(params.turn?.error?.message || 'Le tour Codex a échoué.'));
+      } else {
+        completedResolve(params);
       }
     }
-  })();
+  });
 
   try {
-    const completed = await codex.waitFor(
-      'turn/completed',
-      p => p.threadId === threadId && p.turn?.id === turnId,
-      180000,
-    );
-    if (completed?.turn?.status === 'failed') {
-      throw new Error(completed?.turn?.error?.message || 'Le tour Codex a échoué.');
-    }
-  } finally {
-    done = true;
-  }
+    const start = await codex.request('turn/start', {
+      threadId,
+      input: [{ type: 'text', text: prompt, text_elements: [] }],
+    }, 30000);
 
-  await Promise.race([deltaLoop, new Promise(r => setTimeout(r, 80))]);
-  if (!answer && failure) throw failure;
-  return answer.trim();
+    expectedTurnId = start?.turn?.id;
+    if (!expectedTurnId) throw new Error('Codex n’a pas renvoyé de turnId.');
+    await completed;
+    return answer.trim();
+  } finally {
+    clearTimeout(timeout);
+    unsubscribe();
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -269,9 +238,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
   try {
-    if (req.method === 'GET' && req.url === '/health') {
-      return json(res, 200, { ok: true });
-    }
+    if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true });
 
     if (req.method === 'GET' && req.url === '/account') {
       try { return json(res, 200, await getAccount()); }
@@ -287,17 +254,13 @@ const server = http.createServer(async (req, res) => {
         appBrand: 'codex',
         useHostedLoginSuccessPage: true,
       }, 30000);
-      return json(res, 200, {
-        loginId: login?.loginId || null,
-        authUrl: login?.authUrl || null,
-      });
+      return json(res, 200, { loginId: login?.loginId || null, authUrl: login?.authUrl || null });
     }
 
     if (req.method === 'POST' && req.url === '/chat') {
       const payload = await body(req);
       if (!payload.question || !payload.videoId) return json(res, 400, { error: 'Question ou videoId manquant.' });
-      const answer = await askCodex(payload);
-      return json(res, 200, { answer });
+      return json(res, 200, { answer: await askCodex(payload) });
     }
 
     return json(res, 404, { error: 'Route inconnue.' });
