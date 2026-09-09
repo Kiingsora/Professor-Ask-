@@ -1,5 +1,4 @@
 (() => {
-  const API = 'http://127.0.0.1:43119';
   const DEFAULTS = {
     provider: 'codex',
     responseLanguage: 'auto',
@@ -26,6 +25,25 @@
   };
 
   const qs = (s, root = document) => root.querySelector(s);
+
+  function bridgeFetch(path, { method = 'GET', body } = {}) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'BRIDGE_FETCH', path, method, body },
+        response => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!response) {
+            reject(new Error('Aucune réponse du service worker Professor Ask.'));
+            return;
+          }
+          resolve(response);
+        },
+      );
+    });
+  }
 
   function getVideoId() {
     try { return new URL(location.href).searchParams.get('v'); } catch { return null; }
@@ -69,10 +87,11 @@
       renderStatus();
       return;
     }
+
     try {
-      const r = await fetch(`${API}/account`);
-      const data = await r.json();
-      state.connected = !!data.connected;
+      const response = await bridgeFetch('/account');
+      const data = response.data || {};
+      state.connected = !!(response.ok && data.connected);
       state.account = data.account || null;
     } catch {
       state.connected = false;
@@ -82,7 +101,15 @@
   }
 
   function openSettings() {
-    chrome.runtime.openOptionsPage();
+    chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' }, response => {
+      if (chrome.runtime.lastError) {
+        addMessage('error', `Impossible d'ouvrir les paramètres : ${chrome.runtime.lastError.message}`);
+        return;
+      }
+      if (response && response.ok === false) {
+        addMessage('error', response.error || 'Impossible d’ouvrir les paramètres.');
+      }
+    });
   }
 
   function renderStatus() {
@@ -261,10 +288,9 @@
       const channel = includeMetadata ? (qs('ytd-channel-name a')?.textContent?.trim() || '') : '';
       const context = transcriptContextAt(t);
 
-      const r = await fetch(`${API}/chat`, {
+      const response = await bridgeFetch('/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           provider: state.settings.provider,
           videoId: state.videoId,
           title,
@@ -277,11 +303,11 @@
             responseStyle: state.settings.responseStyle,
             webSearch: state.settings.webSearch,
           },
-        }),
+        },
       });
 
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Erreur Codex');
+      const data = response.data || {};
+      if (!response.ok) throw new Error(response.error || data.error || 'Erreur Codex');
       placeholder.lastElementChild.textContent = data.answer || '(Réponse vide)';
       await saveHistory();
     } catch (e) {
