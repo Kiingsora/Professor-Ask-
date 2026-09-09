@@ -1,5 +1,13 @@
 const BRIDGE_ORIGIN = 'http://127.0.0.1:43119';
-const ALLOWED_BRIDGE_PATHS = new Set(['/health', '/account', '/login', '/chat']);
+const ALLOWED_BRIDGE_PATHS = new Set([
+  '/health',
+  '/account',
+  '/login',
+  '/chat',
+  '/gemini/status',
+  '/gemini/login',
+  '/gemini/api-key',
+]);
 
 chrome.action.onClicked.addListener(() => {
   chrome.runtime.openOptionsPage();
@@ -27,8 +35,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function proxyBridgeRequest(message) {
-  const path = typeof message.path === 'string' ? message.path : '';
-  if (!ALLOWED_BRIDGE_PATHS.has(path)) {
+  const rawPath = typeof message.path === 'string' ? message.path : '';
+  let parsed;
+  try {
+    parsed = new URL(rawPath, BRIDGE_ORIGIN);
+  } catch {
+    return { ok: false, status: 400, data: null, error: 'Route bridge invalide.' };
+  }
+
+  if (parsed.origin !== BRIDGE_ORIGIN || !ALLOWED_BRIDGE_PATHS.has(parsed.pathname)) {
     return { ok: false, status: 400, data: null, error: 'Route bridge non autorisée.' };
   }
 
@@ -49,7 +64,7 @@ async function proxyBridgeRequest(message) {
 
   let response;
   try {
-    response = await fetch(`${BRIDGE_ORIGIN}${path}`, init);
+    response = await fetch(parsed.toString(), init);
   } catch (error) {
     throw new Error(`Bridge local inaccessible: ${error.message || error}`);
   }
