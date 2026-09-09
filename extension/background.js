@@ -24,7 +24,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   // Compatibility layer: content.js and options.js keep using BRIDGE_FETCH,
-  // but the transport is now Chrome Native Messaging instead of localhost HTTP.
+  // while the transport is Chrome Native Messaging rather than localhost HTTP.
   if (message?.type === 'BRIDGE_FETCH') {
     proxyNativeRequest(message)
       .then(sendResponse)
@@ -41,15 +41,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 function friendlyNativeError(message) {
   const text = String(message || '');
   if (/native messaging host.*not found|specified native messaging host not found/i.test(text)) {
-    return 'Professor Ask Companion n’est pas installé. Lance une seule fois “native-host/Installer Professor Ask.vbs”, puis actualise l’extension.';
+    return 'Le composant Professor Ask n’est pas encore installé. Lance une seule fois “Installer Professor Ask.vbs”, puis actualise l’extension.';
   }
   if (/access.*native messaging|not allowed to access native messaging/i.test(text)) {
-    return 'Chrome refuse l’accès au companion Professor Ask. Réinstalle le companion puis actualise l’extension.';
+    return 'Chrome refuse l’accès au composant Professor Ask. Relance “Installer Professor Ask.vbs”, puis actualise l’extension.';
   }
   if (/disconnected|native host has exited|communication with the native messaging host/i.test(text)) {
-    return 'Professor Ask Companion s’est arrêté. Consulte native-host/native-host.log si le problème persiste.';
+    return 'Le composant Professor Ask s’est arrêté de façon inattendue.';
   }
-  return text || 'Professor Ask Companion indisponible.';
+  return text || 'Le composant Professor Ask est indisponible.';
 }
 
 function failNativePending(error) {
@@ -76,7 +76,7 @@ function ensureNativePort() {
     clearTimeout(pending.timer);
 
     if (message?.ok) pending.resolve(message.data);
-    else pending.reject(new Error(message?.error || 'Erreur du companion Professor Ask.'));
+    else pending.reject(new Error(message?.error || 'Erreur du composant Professor Ask.'));
   });
 
   port.onDisconnect.addListener(() => {
@@ -94,7 +94,7 @@ function nativeRequest(payload, timeoutMs = 30000) {
     const port = ensureNativePort();
     const timer = setTimeout(() => {
       nativePending.delete(id);
-      reject(new Error(`Timeout du companion Professor Ask sur ${payload.action || 'requête'}.`));
+      reject(new Error(`Timeout du composant Professor Ask sur ${payload.action || 'requête'}.`));
     }, timeoutMs);
 
     nativePending.set(id, { resolve, reject, timer });
