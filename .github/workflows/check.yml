@@ -32,8 +32,20 @@ jobs:
         run: |
           & .\native-host\install.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Native host installer failed' }
-          if (-not (Test-Path .\native-host\ProfessorAskNativeHost.exe)) { throw 'Native host executable missing' }
-          if (-not (Test-Path .\native-host\com.professorask.bridge.json)) { throw 'Native host manifest missing' }
-          $manifest = Get-Content .\native-host\com.professorask.bridge.json -Raw | ConvertFrom-Json
+
+          $registryPath = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.professorask.bridge'
+          if (-not (Test-Path $registryPath)) { throw 'Native host registry entry missing' }
+
+          $manifestPath = (Get-Item $registryPath).GetValue('')
+          if (-not $manifestPath) { throw 'Native host manifest registry value missing' }
+          if (-not (Test-Path $manifestPath)) { throw "Native host manifest missing: $manifestPath" }
+
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
           if ($manifest.name -ne 'com.professorask.bridge') { throw 'Unexpected native host name' }
           if ($manifest.allowed_origins[0] -ne 'chrome-extension://geibmmecfgilkhncpcjjldbidnejflfb/') { throw 'Unexpected extension origin' }
+          if (-not (Test-Path $manifest.path)) { throw "Native host executable missing: $($manifest.path)" }
+
+          $installRoot = Join-Path $env:LOCALAPPDATA 'ProfessorAsk\NativeHost\0.5.1'
+          if (-not ($manifest.path.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase))) {
+            throw "Native host was not installed under LocalAppData: $($manifest.path)"
+          }
