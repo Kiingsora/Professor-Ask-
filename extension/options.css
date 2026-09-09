@@ -98,7 +98,7 @@ h2 { margin: 0; font-size: 18px; }
   box-shadow: 0 0 0 1px #6a7484 inset;
 }
 
-.provider-card input {
+.provider-card > input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
@@ -133,6 +133,22 @@ h2 { margin: 0; font-size: 18px; }
   gap: 18px;
 }
 
+.connection-panel.connection-stack {
+  display: block;
+}
+
+.connection-copy { margin-bottom: 14px; }
+.provider-config-block {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.provider-help {
+  margin-top: 10px !important;
+  font-size: 12px;
+}
+.full-grid { margin-top: 10px; }
+
 .connection-actions, .danger-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .button {
@@ -164,14 +180,20 @@ h2 { margin: 0; font-size: 18px; }
 }
 
 .field > span, .toggle-row span { display: block; font-weight: 650; margin-bottom: 8px; }
-.field select {
+.field select,
+.field input[type="text"],
+.field input[type="password"] {
   width: 100%;
   border: 1px solid #39414e;
   color: var(--text);
   background: #11151b;
   border-radius: 9px;
   padding: 9px 10px;
+  outline: none;
 }
+.field input:focus, .field select:focus { border-color: #6a7484; }
+.field small { color: var(--muted); display: block; margin-top: 7px; }
+.secret-field { margin-bottom: 10px; }
 
 .toggle-row {
   display: flex;
@@ -195,6 +217,8 @@ h2 { margin: 0; font-size: 18px; }
 }
 
 code { color: #dce4ef; }
+
+[hidden] { display: none !important; }
 
 @media (max-width: 720px) {
   .settings-shell { width: min(100% - 20px, 980px); padding-top: 20px; }
