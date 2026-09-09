@@ -1,9 +1,11 @@
+import { spawn } from 'node:child_process';
 import { buildProfessorPrompt } from '../lib/prompt.js';
-import { commandExists, launchInteractive, runCommand, stripAnsi } from '../lib/process-utils.js';
+import { commandExists, runCommand, stripAnsi } from '../lib/process-utils.js';
 
 export class AntigravityProvider {
   constructor() {
     this.conversations = new Map();
+    this.loginProcess = null;
   }
 
   get id() { return 'antigravity'; }
@@ -11,6 +13,12 @@ export class AntigravityProvider {
 
   async installed() {
     return commandExists('agy', ['--version']);
+  }
+
+  stopLoginProcess() {
+    if (!this.loginProcess) return;
+    try { this.loginProcess.kill(); } catch {}
+    this.loginProcess = null;
   }
 
   async status() {
@@ -37,6 +45,9 @@ export class AntigravityProvider {
         model = stdout.trim() || null;
       }
 
+      // The hidden interactive process is only needed to trigger the first OAuth.
+      // Once credentials exist in Windows Credential Manager, headless calls work.
+      this.stopLoginProcess();
       return { installed: true, connected: true, model };
     } catch (error) {
       return {
@@ -49,19 +60,55 @@ export class AntigravityProvider {
 
   async login() {
     if (!(await this.installed())) {
-      throw new Error('Antigravity CLI (agy) n’est pas installé. Installe-le puis relance le bridge.');
+      throw new Error('Antigravity CLI (agy) n’est pas installé. Installe Antigravity puis réessaie.');
     }
 
-    await launchInteractive('agy');
+    const current = await this.status();
+    if (current.connected) return { ...current, alreadyConnected: true };
+
+    if (this.loginProcess && !this.loginProcess.killed) {
+      return {
+        started: true,
+        opened: true,
+        message: 'La connexion Google Antigravity est déjà en cours dans le navigateur.',
+      };
+    }
+
+    const child = spawn('agy', [], {
+      shell: process.platform === 'win32',
+      windowsHide: true,
+      detached: false,
+      stdio: 'ignore',
+    });
+
+    await new Promise((resolve, reject) => {
+      const onError = error => {
+        child.removeListener('spawn', onSpawn);
+        reject(error);
+      };
+      const onSpawn = () => {
+        child.removeListener('error', onError);
+        resolve();
+      };
+      child.once('error', onError);
+      child.once('spawn', onSpawn);
+    });
+
+    this.loginProcess = child;
+    child.once('exit', () => {
+      if (this.loginProcess === child) this.loginProcess = null;
+    });
+
     return {
       started: true,
       opened: true,
-      message: 'Antigravity a été ouvert. S’il n’existe aucune session enregistrée, le CLI ouvre automatiquement le navigateur pour la connexion Google OAuth.',
+      message: 'Antigravity a lancé le Google OAuth dans ton navigateur. Aucun terminal n’est nécessaire.',
     };
   }
 
   async logout() {
     if (!(await this.installed())) throw new Error('Antigravity CLI n’est pas installé.');
+    this.stopLoginProcess();
     await runCommand('agy', ['-p', '/logout', '--print-timeout', '15s'], { timeoutMs: 22000 });
     this.conversations.clear();
     return { connected: false };
