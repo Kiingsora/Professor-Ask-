@@ -50,10 +50,13 @@ internal static class Program
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
             var nodePathFile = Path.Combine(baseDir, "node-path.txt");
-            var hostScript = Path.Combine(baseDir, "host.js");
+            var hostPathFile = Path.Combine(baseDir, "host-path.txt");
             var logPath = Path.Combine(baseDir, "native-host.log");
 
-            if (!File.Exists(hostScript)) return 11;
+            if (!File.Exists(hostPathFile)) return 11;
+
+            var hostScript = File.ReadAllText(hostPathFile).Trim();
+            if (string.IsNullOrWhiteSpace(hostScript) || !File.Exists(hostScript)) return 11;
 
             var nodePath = File.Exists(nodePathFile)
                 ? File.ReadAllText(nodePathFile).Trim()
@@ -65,7 +68,7 @@ internal static class Program
             {
                 FileName = nodePath,
                 Arguments = "\"" + hostScript + "\"",
-                WorkingDirectory = baseDir,
+                WorkingDirectory = Path.GetDirectoryName(hostScript) ?? baseDir,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
