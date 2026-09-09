@@ -14,9 +14,11 @@ jobs:
           node-version: '20'
       - name: Check JavaScript syntax
         run: |
-          find bridge extension native-host -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          find bridge extension native-host -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
       - name: Validate extension manifest
         run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
+      - name: Smoke test Native Messaging protocol
+        run: node native-host/test-native-host.mjs
 
   native-host-windows:
     runs-on: windows-latest
