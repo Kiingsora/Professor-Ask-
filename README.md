@@ -10,20 +10,34 @@ The assistant receives:
 - optional video title/channel metadata;
 - optional conversation history for the current video.
 
-## AI providers
+## Provider architecture
+
+Professor Ask now treats AI backends as interchangeable providers. The extension only asks a provider for four things:
+
+- connection status;
+- login/logout;
+- available models;
+- a response to the current YouTube question.
+
+Provider-specific OAuth tokens are not handled by the extension.
 
 ### Codex
 
-Codex uses the user's **ChatGPT/Codex account** through the official Codex OAuth flow. Professor Ask starts `codex app-server`, calls `account/login/start`, opens the returned ChatGPT OAuth URL, and then reuses the Codex-managed session. The extension never receives the OAuth access token.
+Codex uses the user's **ChatGPT/Codex account** through the official Codex OAuth flow.
 
-### Gemini
+Professor Ask starts `codex app-server`, calls `account/login/start` with `type: chatgpt`, and the bridge opens the returned ChatGPT OAuth URL in the default browser. Codex owns the callback, persisted credentials, refresh tokens and account session.
 
-Gemini is functional through two supported modes:
+The available model selector is populated dynamically through Codex `model/list`, including the reasoning-effort levels supported by each model.
 
-1. **Google OAuth / Vertex AI** — Professor Ask launches `gcloud auth application-default login`; Google handles browser OAuth and stores Application Default Credentials locally. A Google Cloud Project ID is required for Vertex AI requests.
-2. **Gemini API key** — a Gemini API key can be configured from the settings page. The secret is stored by the local bridge in `bridge/.professor-ask-secrets.json`, which is ignored by Git.
+### Google Antigravity
 
-Professor Ask does not reuse Gemini CLI consumer OAuth credentials. Google explicitly restricts third-party software from piggybacking on Gemini CLI OAuth for backend access.
+Antigravity uses the user's **Google/Antigravity account** through the official `agy` CLI.
+
+Professor Ask does not create or store a Google OAuth token. Clicking **Se connecter avec Google** launches the official Antigravity CLI. If no cached session exists, `agy` opens the default browser and runs its normal Google OAuth flow. The resulting session is stored in the operating system secure credential store used by Antigravity.
+
+The model selector is populated dynamically with `agy models`. This can expose Gemini models and any other models Antigravity makes available to the connected account.
+
+Questions are executed through Antigravity headless mode using `agy -p ... --output-format json`, and conversations are resumed per YouTube video when possible.
 
 ## Architecture
 
@@ -34,12 +48,15 @@ YouTube page
       -> extension/background.js
           -> http://127.0.0.1:43119
               -> bridge/server.js
-                  -> Codex app-server -> ChatGPT OAuth
-                  -> Vertex AI -> Google OAuth / ADC
-                  -> Gemini API -> API key
+                  -> providers/codex.js
+                      -> codex app-server
+                      -> ChatGPT OAuth
+                  -> providers/antigravity.js
+                      -> agy CLI
+                      -> Google OAuth / Antigravity account
 ```
 
-The local bridge does **not** run a local AI model. It only handles provider authentication and requests.
+The local bridge does **not** run a local AI model and does not persist OAuth access tokens.
 
 ## Requirements
 
@@ -52,14 +69,15 @@ For Codex:
 
 - Codex CLI installed and available as `codex`
 
-For Gemini with Google OAuth / Vertex AI:
+For Antigravity:
 
-- Google Cloud CLI installed and available as `gcloud`
-- a Google Cloud project with Vertex AI access enabled
+- Antigravity CLI installed and available as `agy`
 
-For Gemini API:
+Windows installation command from the official Antigravity documentation:
 
-- a Gemini API key
+```powershell
+irm https://antigravity.google/cli/install.ps1 | iex
+```
 
 ## Run the bridge
 
@@ -68,51 +86,54 @@ cd bridge
 npm start
 ```
 
-On Windows you can also run `bridge/start.bat`.
+On Windows you can also run:
+
+```text
+bridge\start.bat
+```
 
 The bridge listens only on `127.0.0.1:43119`.
 
-## Install the extension
+## Install / reload the extension
 
-1. Open `chrome://extensions` (or `edge://extensions`).
+1. Open `chrome://extensions` or `edge://extensions`.
 2. Enable Developer mode.
-3. Click **Load unpacked**.
-4. Select the `extension` folder.
-5. Open a YouTube video.
-6. Open **Professor Ask settings** from the gear button in the YouTube panel or by clicking the extension icon.
+3. Load the `extension` folder if needed.
+4. After each `git pull`, click **Reload** on Professor Ask.
+5. Reload the YouTube tab.
 
 ## Connect Codex
 
-1. Select **Codex**.
-2. Click **Se connecter avec ChatGPT**.
-3. Complete the ChatGPT OAuth flow in the browser tab opened by Codex.
-4. The settings page polls the local Codex account state and switches to connected automatically.
+1. Start the Professor Ask bridge.
+2. Open Professor Ask settings.
+3. Select **Codex**.
+4. Click **Se connecter avec ChatGPT**.
+5. The bridge opens the ChatGPT OAuth page in the default browser.
+6. Complete the login.
+7. Professor Ask refreshes the account state and loads the models available to that account.
 
-## Connect Gemini with Google OAuth
+## Connect Antigravity
 
-1. Select **Gemini**.
-2. Choose **Google OAuth — Vertex AI**.
-3. Enter the Google Cloud Project ID and keep the location on `global` unless needed otherwise.
-4. Click **Se connecter avec Google**.
-5. Complete the browser login opened by Google Cloud CLI.
-6. After authentication, Professor Ask uses Application Default Credentials to call Vertex AI.
-
-## Connect Gemini with an API key
-
-1. Select **Gemini**.
-2. Choose **Clé Gemini API**.
-3. Paste the key in the Gemini settings panel.
-4. Click **Enregistrer la clé**.
+1. Install `agy` if needed.
+2. Start the Professor Ask bridge.
+3. Open Professor Ask settings.
+4. Select **Antigravity**.
+5. Click **Se connecter avec Google**.
+6. Professor Ask launches the official Antigravity CLI in a terminal.
+7. If the account is not already authenticated, Antigravity opens the browser and starts its Google OAuth flow.
+8. Complete the login and return to Professor Ask.
+9. The settings page detects the session and loads `agy models`.
 
 ## Settings
 
 The options page exposes:
 
-- provider selection: Codex / Gemini;
-- Codex ChatGPT OAuth connection and account status;
-- Gemini Google OAuth / Vertex AI connection;
-- Gemini API key connection;
-- Gemini model selection;
+- provider selection: Codex / Antigravity;
+- ChatGPT/Codex OAuth status, login and logout;
+- Google/Antigravity OAuth status, login and logout;
+- dynamic Codex model selection;
+- dynamic Codex reasoning-effort selection;
+- dynamic Antigravity model selection;
 - answer language;
 - answer detail level;
 - web-search policy;
@@ -124,29 +145,17 @@ The options page exposes:
 - local conversation-history enable/disable and retention limit;
 - clear-history and reset-settings actions.
 
-Non-secret settings are saved with `chrome.storage.sync`. Conversation history is stored with `chrome.storage.local`. Gemini API secrets stay in the local bridge and are not stored in Chrome sync.
-
-## Current MVP
-
-- YouTube side panel injected next to the video
-- dedicated settings page
-- current timestamp displayed live
-- timestamped transcript extraction through YouTube caption tracks
-- configurable transcript context radius
-- optional chat history stored per video
-- Codex OAuth through `account/login/start`
-- Gemini via Vertex AI OAuth/ADC or Gemini API key
-- Codex thread creation per YouTube video
-- Gemini 3.8 Flash as the default Gemini model
-- configurable answer language/detail/web-search behavior
-- Google Search grounding for Gemini when web search is enabled
-- bridge traffic proxied through the extension service worker to avoid YouTube CORS restrictions
+Non-secret settings are saved with `chrome.storage.sync`. Conversation history is stored with `chrome.storage.local`.
 
 ## Security notes
 
-- The extension never receives the ChatGPT OAuth access token.
-- Codex credentials remain owned by Codex app-server.
-- Google OAuth credentials remain in Google Application Default Credentials.
-- Gemini API keys are stored only by the local bridge in a Git-ignored file.
+- The extension never receives the ChatGPT OAuth token.
+- Codex owns and refreshes its ChatGPT session.
+- Professor Ask never receives the Google OAuth token used by Antigravity.
+- Antigravity owns its account session through its secure local credential store.
 - The bridge binds to loopback only.
-- No transcript or chat is sent anywhere except to the selected AI provider when the user asks a question.
+- No transcript or chat is sent anywhere except to the selected provider when the user asks a question.
+
+## TipTour reference
+
+The provider-settings organization is intentionally similar to the clean separation used by TipTour: the UI selects/configures providers while provider-specific credential logic stays outside the rest of the application. The current public TipTour source itself uses locally stored provider keys rather than the Codex/Antigravity OAuth flows used here.
