@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">Professor Ask</p>
         <h1>Paramètres</h1>
-        <p class="lede">Configure le fournisseur IA, le contexte vidéo, le comportement des réponses et la confidentialité.</p>
+        <p class="lede">Configure le fournisseur IA, la connexion au compte, le contexte vidéo et le comportement des réponses.</p>
       </div>
       <div class="save-state" id="save-state">Enregistré</div>
     </header>
@@ -21,7 +21,7 @@
       <div class="section-heading">
         <div>
           <h2>Fournisseur IA</h2>
-          <p>Choisis le compte utilisé pour répondre aux questions.</p>
+          <p>Choisis le moteur qui répondra dans le panneau YouTube.</p>
         </div>
       </div>
 
@@ -44,32 +44,81 @@
             <div class="provider-icon">G</div>
             <div>
               <strong>Gemini</strong>
-              <span>Compte Google / Gemini</span>
+              <span>Google Cloud OAuth ou Gemini API</span>
             </div>
           </div>
-          <div class="provider-status muted">Connecteur chat à brancher</div>
+          <div class="provider-status muted" id="gemini-status">Vérification…</div>
         </label>
       </div>
 
       <div class="connection-panel" id="codex-panel">
         <div>
-          <strong>Connexion Codex</strong>
-          <p>L’authentification est gérée par le bridge local et le client Codex officiel. L’extension ne reçoit pas ton token OAuth.</p>
+          <strong>Connexion Codex avec ChatGPT</strong>
+          <p>Le bouton lance le flux OAuth officiel de Codex. Le navigateur s’ouvre sur ChatGPT, puis Codex conserve et renouvelle lui-même la session. Professor Ask ne reçoit pas le token OAuth.</p>
         </div>
         <div class="connection-actions">
-          <button class="button primary" id="connect-codex">Connecter Codex</button>
+          <button class="button primary" id="connect-codex">Se connecter avec ChatGPT</button>
           <button class="button" id="refresh-codex">Actualiser</button>
         </div>
       </div>
 
-      <div class="connection-panel" id="gemini-panel" hidden>
-        <div>
-          <strong>Gemini</strong>
-          <p>La page fournisseur est prête. Le transport Gemini n’est pas encore branché au bridge Professor Ask.</p>
+      <div class="connection-panel connection-stack" id="gemini-panel" hidden>
+        <div class="connection-copy">
+          <strong>Connexion Gemini</strong>
+          <p>Pour une application tierce, Professor Ask utilise soit Google Cloud OAuth avec Vertex AI, soit la Gemini API. L’OAuth interne du Gemini CLI grand public n’est pas réutilisé.</p>
         </div>
-        <div class="connection-actions">
-          <button class="button primary" id="open-gemini">Ouvrir Gemini</button>
-          <button class="button" id="open-gemini-docs">Documentation Gemini</button>
+
+        <div class="settings-grid full-grid">
+          <label class="field">
+            <span>Méthode de connexion Gemini</span>
+            <select id="gemini-auth-mode">
+              <option value="vertex">Google OAuth — Vertex AI</option>
+              <option value="apiKey">Clé Gemini API</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Modèle Gemini</span>
+            <select id="gemini-model">
+              <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+              <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="gemini-vertex-fields" class="provider-config-block">
+          <div class="settings-grid full-grid">
+            <label class="field">
+              <span>Google Cloud Project ID</span>
+              <input id="gemini-project" type="text" autocomplete="off" placeholder="mon-projet-gcp" />
+            </label>
+            <label class="field">
+              <span>Région Vertex AI</span>
+              <input id="gemini-location" type="text" autocomplete="off" placeholder="global" />
+            </label>
+          </div>
+          <div class="connection-actions">
+            <button class="button primary" id="connect-gemini-google">Se connecter avec Google</button>
+            <button class="button" id="refresh-gemini">Actualiser</button>
+            <button class="button" id="open-google-cloud">Ouvrir Google Cloud</button>
+          </div>
+          <p class="provider-help">Cette connexion ouvre l’authentification Google via <code>gcloud auth application-default login</code>. Google Cloud CLI doit être installé sur la machine.</p>
+        </div>
+
+        <div id="gemini-api-fields" class="provider-config-block" hidden>
+          <label class="field secret-field">
+            <span>Clé Gemini API</span>
+            <input id="gemini-api-key" type="password" autocomplete="off" placeholder="Coller une clé Google AI Studio" />
+            <small>La clé est envoyée uniquement au bridge local et enregistrée dans un fichier ignoré par Git.</small>
+          </label>
+          <div class="connection-actions">
+            <button class="button primary" id="save-gemini-api-key">Enregistrer la clé</button>
+            <button class="button" id="clear-gemini-api-key">Supprimer la clé</button>
+            <button class="button" id="open-ai-studio">Créer/gérer une clé</button>
+          </div>
         </div>
       </div>
     </section>
@@ -222,7 +271,7 @@
 
     <footer class="footer-note">
       <span>Bridge local : <code>http://127.0.0.1:43119</code></span>
-      <span>Professor Ask v0.2</span>
+      <span>Professor Ask v0.3</span>
     </footer>
   </main>
 
