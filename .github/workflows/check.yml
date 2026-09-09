@@ -14,6 +14,24 @@ jobs:
           node-version: '20'
       - name: Check JavaScript syntax
         run: |
-          find bridge extension -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          find bridge extension native-host -type f -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Validate extension manifest
         run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
+
+  native-host-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Compile and register Native Messaging companion
+        shell: powershell
+        run: |
+          & .\native-host\install.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Native host installer failed' }
+          if (-not (Test-Path .\native-host\ProfessorAskNativeHost.exe)) { throw 'Native host executable missing' }
+          if (-not (Test-Path .\native-host\com.professorask.bridge.json)) { throw 'Native host manifest missing' }
+          $manifest = Get-Content .\native-host\com.professorask.bridge.json -Raw | ConvertFrom-Json
+          if ($manifest.name -ne 'com.professorask.bridge') { throw 'Unexpected native host name' }
+          if ($manifest.allowed_origins[0] -ne 'chrome-extension://geibmmecfgilkhncpcjjldbidnejflfb/') { throw 'Unexpected extension origin' }
