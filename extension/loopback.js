@@ -7,6 +7,7 @@
   let banner;
   let retryButton;
   let statusText;
+  let replayingClick = false;
 
   function ensureBanner() {
     if (banner) return banner;
@@ -27,7 +28,7 @@
     hero?.insertAdjacentElement('afterend', banner);
     retryButton = banner.querySelector('#loopback-retry');
     statusText = banner.querySelector('#loopback-diagnostic-text');
-    retryButton?.addEventListener('click', () => probeLoopback(true));
+    retryButton?.addEventListener('click', () => probeLoopback(true).catch(() => {}));
     return banner;
   }
 
@@ -91,6 +92,24 @@
   }
 
   window.professorAskProbeLoopback = probeLoopback;
+
+  document.addEventListener('click', async event => {
+    const button = event.target.closest?.('#connect-codex, #connect-antigravity');
+    if (!button || replayingClick || window.professorAskLoopbackReady) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    try {
+      await probeLoopback(true);
+      replayingClick = true;
+      button.click();
+    } catch {
+      // The diagnostic banner already contains the useful error.
+    } finally {
+      replayingClick = false;
+    }
+  }, true);
 
   document.addEventListener('DOMContentLoaded', () => {
     ensureBanner();
