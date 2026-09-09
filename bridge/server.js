@@ -50,7 +50,7 @@ class CodexClient {
       clientInfo: {
         name: 'professor-ask',
         title: 'Professor Ask',
-        version: '0.1.0',
+        version: '0.2.0',
       },
       capabilities: { experimentalApi: true },
     }, 15000);
@@ -166,14 +166,33 @@ function buildPrompt(payload) {
     .filter(Boolean)
     .join('\n');
 
-  return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || 'Inconnu'}\nChaîne: ${payload.channel || 'Inconnue'}\nPosition actuelle: ${formatTime(payload.timestamp)}\n\nTRANSCRIPTION AUTOUR DU MOMENT ACTUEL\n${transcript || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Prends la transcription et le timestamp comme contexte principal.\n- Explique clairement ce qui est dit ou sous-entendu autour du moment actuel.\n- Si la question nécessite des informations absentes de la vidéo, des faits récents ou une vérification, utilise la recherche web disponible dans Codex.\n- Distingue clairement ce qui vient de la vidéo de ce qui vient de sources externes.\n- Quand tu utilises le web, donne les sources ou liens pertinents.\n- Réponds dans la langue de l'utilisateur.`;
+  const settings = payload.settings || {};
+  const languageInstruction = {
+    fr: 'Réponds en français.',
+    en: 'Answer in English.',
+    auto: 'Réponds dans la langue utilisée par l’utilisateur.',
+  }[settings.responseLanguage] || 'Réponds dans la langue utilisée par l’utilisateur.';
+
+  const styleInstruction = {
+    concise: 'Sois concis et va directement à l’explication utile.',
+    balanced: 'Donne une réponse claire, structurée et de longueur modérée.',
+    detailed: 'Donne une réponse détaillée avec le contexte et les nuances utiles.',
+  }[settings.responseStyle] || 'Donne une réponse claire, structurée et de longueur modérée.';
+
+  const webInstruction = {
+    off: 'N’utilise pas la recherche web. Base-toi sur la transcription et tes connaissances disponibles.',
+    always: 'Quand la question contient un fait vérifiable, actuel ou externe à la vidéo, vérifie-le avec la recherche web et cite les sources utiles.',
+    auto: 'Utilise la recherche web lorsque la vidéo ne suffit pas, lorsqu’une information est récente ou lorsqu’une vérification externe améliore la précision. Cite alors les sources utiles.',
+  }[settings.webSearch] || 'Utilise la recherche web lorsque la vidéo ne suffit pas ou lorsqu’une vérification externe améliore la précision.';
+
+  return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || '(non envoyé)'}\nChaîne: ${payload.channel || '(non envoyée)'}\nPosition actuelle: ${formatTime(payload.timestamp)}\n\nTRANSCRIPTION AUTOUR DU MOMENT ACTUEL\n${transcript || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Prends la transcription et le timestamp comme contexte principal.\n- Explique clairement ce qui est dit ou sous-entendu autour du moment actuel.\n- Distingue ce qui vient de la vidéo de ce qui vient d’informations externes.\n- ${webInstruction}\n- ${styleInstruction}\n- ${languageInstruction}`;
 }
 
 async function getThread(videoId) {
   if (threads.has(videoId)) return threads.get(videoId);
   const started = await codex.request('thread/start', {
     ephemeral: true,
-    baseInstructions: 'You are Professor Ask, a concise educational assistant for discussing the currently watched YouTube video. Use web search when current or external verification is useful.',
+    baseInstructions: 'You are Professor Ask, an educational assistant for discussing the currently watched YouTube video. Follow the per-turn instructions about transcript context, answer language, detail level, and web search.',
   }, 30000);
   const id = started?.thread?.id;
   if (!id) throw new Error('Codex n’a pas renvoyé de threadId.');
@@ -260,6 +279,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/chat') {
       const payload = await body(req);
       if (!payload.question || !payload.videoId) return json(res, 400, { error: 'Question ou videoId manquant.' });
+      if (payload.provider && payload.provider !== 'codex') return json(res, 400, { error: `Fournisseur non pris en charge par ce bridge: ${payload.provider}` });
       return json(res, 200, { answer: await askCodex(payload) });
     }
 
