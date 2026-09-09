@@ -1,4 +1,8 @@
-const BRIDGE_ORIGIN = 'http://127.0.0.1:43119';
+const BRIDGE_ORIGINS = [
+  'http://127.0.0.1:43119',
+  'http://localhost:43119',
+];
+
 const ALLOWED_BRIDGE_PATHS = new Set([
   '/health',
   '/account',
@@ -46,17 +50,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
-async function proxyBridgeRequest(message) {
-  const rawPath = typeof message.path === 'string' ? message.path : '';
+function validateBridgePath(rawPath) {
+  const path = typeof rawPath === 'string' ? rawPath : '';
   let parsed;
   try {
-    parsed = new URL(rawPath, BRIDGE_ORIGIN);
+    parsed = new URL(path, BRIDGE_ORIGINS[0]);
   } catch {
-    return { ok: false, status: 400, data: null, error: 'Route bridge invalide.' };
+    return { ok: false, error: 'Route bridge invalide.' };
   }
 
-  if (parsed.origin !== BRIDGE_ORIGIN || !ALLOWED_BRIDGE_PATHS.has(parsed.pathname)) {
-    return { ok: false, status: 400, data: null, error: 'Route bridge non autorisée.' };
+  if (!ALLOWED_BRIDGE_PATHS.has(parsed.pathname)) {
+    return { ok: false, error: 'Route bridge non autorisée.' };
+  }
+
+  return { ok: true, pathname: parsed.pathname, search: parsed.search };
+}
+
+async function proxyBridgeRequest(message) {
+  const validated = validateBridgePath(message.path);
+  if (!validated.ok) {
+    return { ok: false, status: 400, data: null, error: validated.error };
   }
 
   const method = String(message.method || 'GET').toUpperCase();
@@ -66,6 +79,8 @@ async function proxyBridgeRequest(message) {
 
   const init = {
     method,
+    cache: 'no-store',
+    credentials: 'omit',
     headers: { Accept: 'application/json' },
   };
 
@@ -74,27 +89,42 @@ async function proxyBridgeRequest(message) {
     init.body = JSON.stringify(message.body);
   }
 
-  let response;
-  try {
-    response = await fetch(parsed.toString(), init);
-  } catch (error) {
-    throw new Error(`Bridge local inaccessible: ${error.message || error}`);
-  }
+  const errors = [];
 
-  let data = null;
-  const text = await response.text();
-  if (text) {
+  for (const origin of BRIDGE_ORIGINS) {
+    const url = `${origin}${validated.pathname}${validated.search}`;
+    let response;
+
     try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
+      response = await fetch(url, init);
+    } catch (error) {
+      errors.push(`${origin}: ${error.message || error}`);
+      continue;
     }
+
+    let data = null;
+    const text = await response.text();
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+      bridgeOrigin: origin,
+      error: response.ok ? null : (data?.error || `Erreur bridge HTTP ${response.status}`),
+    };
   }
 
   return {
-    ok: response.ok,
-    status: response.status,
-    data,
-    error: response.ok ? null : (data?.error || `Erreur bridge HTTP ${response.status}`),
+    ok: false,
+    status: 0,
+    data: null,
+    error: `Bridge local inaccessible. Tentatives: ${errors.join(' | ')}`,
   };
 }
