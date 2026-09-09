@@ -1,3 +1,9 @@
 bridge/.professor-ask-secrets.json
 node_modules/
 .DS_Store
+
+native-host/ProfessorAskNativeHost.exe
+native-host/com.professorask.bridge.json
+native-host/node-path.txt
+native-host/install-status.txt
+native-host/native-host.log
