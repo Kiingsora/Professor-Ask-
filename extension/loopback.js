@@ -1,9 +1,4 @@
 (() => {
-  const ORIGINS = [
-    'http://127.0.0.1:43119',
-    'http://localhost:43119',
-  ];
-
   let banner;
   let retryButton;
   let statusText;
@@ -18,7 +13,7 @@
     banner.className = 'loopback-diagnostic';
     banner.innerHTML = `
       <div>
-        <strong>Bridge local</strong>
+        <strong>Professor Ask Companion</strong>
         <span id="loopback-diagnostic-text">Vérification…</span>
       </div>
       <button class="button" id="loopback-retry" type="button">Retester</button>
@@ -28,7 +23,13 @@
     hero?.insertAdjacentElement('afterend', banner);
     retryButton = banner.querySelector('#loopback-retry');
     statusText = banner.querySelector('#loopback-diagnostic-text');
-    retryButton?.addEventListener('click', () => probeLoopback(true).catch(() => {}));
+    retryButton?.addEventListener('click', () => probeCompanion().catch(() => {}));
+
+    const footerFirst = document.querySelector('.footer-note span:first-child');
+    if (footerFirst) footerFirst.innerHTML = 'Companion : <code>Chrome Native Messaging</code>';
+    const footerLast = document.querySelector('.footer-note span:last-child');
+    if (footerLast) footerLast.textContent = 'Professor Ask v0.5';
+
     return banner;
   }
 
@@ -39,59 +40,48 @@
     statusText.textContent = text;
   }
 
-  async function probeOrigin(origin) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
-    try {
-      const response = await fetch(`${origin}/health`, {
-        method: 'GET',
-        cache: 'no-store',
-        credentials: 'omit',
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json().catch(() => ({}));
-      if (!data?.ok) throw new Error('Réponse health invalide');
-      return { origin, data };
-    } finally {
-      clearTimeout(timeout);
-    }
+  function companionRequest() {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'BRIDGE_FETCH', path: '/health', method: 'GET' },
+        response => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!response?.ok) {
+            reject(new Error(response?.error || 'Professor Ask Companion indisponible.'));
+            return;
+          }
+          resolve(response.data || {});
+        },
+      );
+    });
   }
 
-  async function probeLoopback(fromUserGesture = false) {
+  async function probeCompanion() {
     ensureBanner();
-    setState(
-      fromUserGesture
-        ? 'Nouvelle tentative… Si Chrome demande l’accès au réseau local, autorise-le.'
-        : 'Vérification…',
-      'checking',
-    );
+    setState('Vérification du companion Windows…', 'checking');
 
-    const errors = [];
-    for (const origin of ORIGINS) {
-      try {
-        const result = await probeOrigin(origin);
-        setState(
-          `Connecté à ${origin} · bridge v${result.data.version || '?'} · PID ${result.data.pid || '?'}`,
-          'ok',
-        );
-        window.professorAskLoopbackReady = true;
-        window.professorAskBridgeOrigin = origin;
-        return result;
-      } catch (error) {
-        errors.push(`${origin}: ${error.name === 'AbortError' ? 'timeout' : (error.message || error)}`);
-      }
+    try {
+      const data = await companionRequest();
+      setState(
+        `Installé · Native Messaging · v${data.version || '?'} · PID ${data.pid || '?'}`,
+        'ok',
+      );
+      window.professorAskLoopbackReady = true;
+      return data;
+    } catch (error) {
+      window.professorAskLoopbackReady = false;
+      setState(
+        `${error.message} Aucun terminal ne doit rester ouvert : le companion est lancé automatiquement par Chrome une fois installé.`,
+        'error',
+      );
+      throw error;
     }
-
-    window.professorAskLoopbackReady = false;
-    setState(
-      `Inaccessible. ${errors.join(' | ')}. Vérifie que bridge\\start.bat est ouvert, puis clique sur Retester.`,
-      'error',
-    );
-    throw new Error(errors.join(' | '));
   }
 
-  window.professorAskProbeLoopback = probeLoopback;
+  window.professorAskProbeLoopback = probeCompanion;
 
   document.addEventListener('click', async event => {
     const button = event.target.closest?.('#connect-codex, #connect-antigravity');
@@ -101,11 +91,11 @@
     event.stopImmediatePropagation();
 
     try {
-      await probeLoopback(true);
+      await probeCompanion();
       replayingClick = true;
       button.click();
     } catch {
-      // The diagnostic banner already contains the useful error.
+      // The companion banner already contains the useful error.
     } finally {
       replayingClick = false;
     }
@@ -113,6 +103,6 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     ensureBanner();
-    probeLoopback(false).catch(() => {});
+    probeCompanion().catch(() => {});
   });
 })();
