@@ -1,5 +1,4 @@
 (() => {
-  const API = 'http://127.0.0.1:43119';
   const DEFAULTS = {
     provider: 'codex',
     responseLanguage: 'auto',
@@ -13,11 +12,34 @@
     panelSize: 'standard',
     rememberHistory: true,
     historyLimit: 30,
+    geminiAuthMode: 'vertex',
+    geminiProject: '',
+    geminiLocation: 'global',
+    geminiModel: 'gemini-3.8-flash',
   };
 
   const $ = id => document.getElementById(id);
   let settings = { ...DEFAULTS };
   let saveTimer = null;
+
+  function bridgeFetch(path, { method = 'GET', body } = {}) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'BRIDGE_FETCH', path, method, body },
+        response => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          if (!response) {
+            reject(new Error('Aucune réponse du service worker Professor Ask.'));
+            return;
+          }
+          resolve(response);
+        },
+      );
+    });
+  }
 
   function setSaveState(text, kind = '') {
     const el = $('save-state');
@@ -32,6 +54,13 @@
     document.querySelectorAll('[data-provider-card]').forEach(card => {
       card.classList.toggle('selected', card.dataset.providerCard === provider);
     });
+    setGeminiAuthPanel();
+  }
+
+  function setGeminiAuthPanel() {
+    const mode = settings.geminiAuthMode || 'vertex';
+    $('gemini-vertex-fields').hidden = mode !== 'vertex';
+    $('gemini-api-fields').hidden = mode !== 'apiKey';
   }
 
   function readForm() {
@@ -49,6 +78,10 @@
       panelSize: $('panel-size').value,
       rememberHistory: $('remember-history').checked,
       historyLimit: Number($('history-limit').value),
+      geminiAuthMode: $('gemini-auth-mode').value,
+      geminiProject: $('gemini-project').value.trim(),
+      geminiLocation: $('gemini-location').value.trim() || 'global',
+      geminiModel: $('gemini-model').value,
     };
   }
 
@@ -67,6 +100,10 @@
     $('panel-size').value = settings.panelSize;
     $('remember-history').checked = !!settings.rememberHistory;
     $('history-limit').value = String(settings.historyLimit);
+    $('gemini-auth-mode').value = settings.geminiAuthMode;
+    $('gemini-project').value = settings.geminiProject;
+    $('gemini-location').value = settings.geminiLocation;
+    $('gemini-model').value = settings.geminiModel;
     setProviderPanels();
   }
 
@@ -93,24 +130,25 @@
     status.textContent = 'Vérification…';
     status.className = 'provider-status muted';
     try {
-      const response = await fetch(`${API}/account`);
-      const data = await response.json();
-      if (data.connected) {
+      const response = await bridgeFetch('/account');
+      const data = response.data || {};
+      if (response.ok && data.connected) {
         const email = data.account?.email ? ` · ${data.account.email}` : '';
-        status.textContent = `Connecté${email}`;
+        const plan = data.account?.plan_type ? ` · ${data.account.plan_type}` : '';
+        status.textContent = `Connecté${email}${plan}`;
         status.className = 'provider-status';
-        button.textContent = 'Codex connecté';
+        button.textContent = 'ChatGPT connecté';
         button.disabled = true;
       } else {
         status.textContent = data.bridgeError ? 'Bridge/Codex indisponible' : 'Non connecté';
         status.className = 'provider-status warn';
-        button.textContent = 'Connecter Codex';
+        button.textContent = 'Se connecter avec ChatGPT';
         button.disabled = false;
       }
     } catch {
       status.textContent = 'Bridge local hors ligne';
       status.className = 'provider-status warn';
-      button.textContent = 'Connecter Codex';
+      button.textContent = 'Se connecter avec ChatGPT';
       button.disabled = false;
     }
   }
@@ -119,33 +157,104 @@
     const button = $('connect-codex');
     const status = $('codex-status');
     button.disabled = true;
-    button.textContent = 'Ouverture…';
+    button.textContent = 'Ouverture OAuth…';
     try {
-      const response = await fetch(`${API}/login`, { method: 'POST' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Connexion Codex impossible.');
+      const response = await bridgeFetch('/login', { method: 'POST' });
+      const data = response.data || {};
+      if (!response.ok) throw new Error(response.error || data.error || 'Connexion Codex impossible.');
       if (data.connected) {
         await refreshCodex();
         return;
       }
-      if (!data.authUrl) throw new Error('Codex n’a pas renvoyé de lien de connexion.');
+      if (!data.authUrl) throw new Error('Codex n’a pas renvoyé de lien OAuth ChatGPT.');
       await chrome.tabs.create({ url: data.authUrl });
-      status.textContent = 'Connexion ouverte dans un nouvel onglet…';
+      status.textContent = 'OAuth ChatGPT ouvert dans un nouvel onglet…';
       status.className = 'provider-status warn';
-      for (let i = 0; i < 90; i++) {
+      for (let i = 0; i < 120; i++) {
         await new Promise(resolve => setTimeout(resolve, 1500));
-        try {
-          const account = await fetch(`${API}/account`).then(r => r.json());
-          if (account.connected) break;
-        } catch {}
+        const account = await bridgeFetch('/account').catch(() => null);
+        if (account?.ok && account.data?.connected) break;
       }
       await refreshCodex();
     } catch (error) {
       status.textContent = error.message;
       status.className = 'provider-status warn';
       button.disabled = false;
-      button.textContent = 'Connecter Codex';
+      button.textContent = 'Se connecter avec ChatGPT';
     }
+  }
+
+  async function refreshGemini() {
+    settings = readForm();
+    const status = $('gemini-status');
+    status.textContent = 'Vérification…';
+    status.className = 'provider-status muted';
+    try {
+      const response = await bridgeFetch(`/gemini/status?mode=${encodeURIComponent(settings.geminiAuthMode)}`);
+      const data = response.data || {};
+      if (response.ok && data.connected) {
+        if (settings.geminiAuthMode === 'vertex') {
+          status.textContent = data.email ? `Google connecté · ${data.email}` : 'Google Cloud OAuth connecté';
+        } else {
+          status.textContent = 'Clé Gemini API configurée';
+        }
+        status.className = 'provider-status';
+      } else {
+        status.textContent = settings.geminiAuthMode === 'vertex'
+          ? (data.error ? 'Google Cloud OAuth non connecté' : 'Google Cloud OAuth non connecté')
+          : 'Clé Gemini API non configurée';
+        status.className = 'provider-status warn';
+      }
+    } catch {
+      status.textContent = 'Bridge local hors ligne';
+      status.className = 'provider-status warn';
+    }
+  }
+
+  async function connectGeminiGoogle() {
+    const button = $('connect-gemini-google');
+    const status = $('gemini-status');
+    button.disabled = true;
+    button.textContent = 'Ouverture OAuth…';
+    try {
+      const response = await bridgeFetch('/gemini/login', { method: 'POST' });
+      if (!response.ok) throw new Error(response.error || response.data?.error || 'Connexion Google impossible.');
+      status.textContent = 'Connexion Google ouverte dans le navigateur…';
+      status.className = 'provider-status warn';
+      for (let i = 0; i < 120; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        const check = await bridgeFetch('/gemini/status?mode=vertex').catch(() => null);
+        if (check?.ok && check.data?.connected) break;
+      }
+      await refreshGemini();
+    } catch (error) {
+      status.textContent = error.message;
+      status.className = 'provider-status warn';
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Se connecter avec Google';
+    }
+  }
+
+  async function saveGeminiApiKey(clear = false) {
+    const input = $('gemini-api-key');
+    const key = clear ? '' : input.value.trim();
+    if (!clear && !key) {
+      $('gemini-status').textContent = 'Colle une clé Gemini API avant de l’enregistrer.';
+      $('gemini-status').className = 'provider-status warn';
+      return;
+    }
+    const response = await bridgeFetch('/gemini/api-key', {
+      method: 'POST',
+      body: { apiKey: key },
+    });
+    if (!response.ok) {
+      $('gemini-status').textContent = response.error || 'Impossible d’enregistrer la clé.';
+      $('gemini-status').className = 'provider-status warn';
+      return;
+    }
+    input.value = '';
+    await refreshGemini();
   }
 
   async function clearHistory() {
@@ -162,20 +271,30 @@
     writeForm(DEFAULTS);
     await chrome.storage.sync.set(DEFAULTS);
     setSaveState('Paramètres réinitialisés', 'ok');
+    await refreshGemini();
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
     await loadSettings();
-    await refreshCodex();
+    await Promise.all([refreshCodex(), refreshGemini()]);
 
     document.querySelectorAll('select, input[type="checkbox"], input[name="provider"]').forEach(control => {
-      control.addEventListener('change', scheduleSave);
+      control.addEventListener('change', async () => {
+        scheduleSave();
+        if (control.id === 'gemini-auth-mode') await refreshGemini();
+      });
     });
+    $('gemini-project').addEventListener('input', scheduleSave);
+    $('gemini-location').addEventListener('input', scheduleSave);
 
     $('connect-codex').addEventListener('click', connectCodex);
     $('refresh-codex').addEventListener('click', refreshCodex);
-    $('open-gemini').addEventListener('click', () => chrome.tabs.create({ url: 'https://gemini.google.com/app' }));
-    $('open-gemini-docs').addEventListener('click', () => chrome.tabs.create({ url: 'https://github.com/google-gemini/gemini-cli' }));
+    $('connect-gemini-google').addEventListener('click', connectGeminiGoogle);
+    $('refresh-gemini').addEventListener('click', refreshGemini);
+    $('save-gemini-api-key').addEventListener('click', () => saveGeminiApiKey(false));
+    $('clear-gemini-api-key').addEventListener('click', () => saveGeminiApiKey(true));
+    $('open-google-cloud').addEventListener('click', () => chrome.tabs.create({ url: 'https://console.cloud.google.com/' }));
+    $('open-ai-studio').addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/apikey' }));
     $('clear-history').addEventListener('click', clearHistory);
     $('reset-settings').addEventListener('click', resetSettings);
   });
