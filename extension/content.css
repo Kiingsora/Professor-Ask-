@@ -1,0 +1,127 @@
+#professor-ask-root {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 16px 0;
+  color: #f1f1f1;
+  font: 14px/1.45 Roboto, Arial, sans-serif;
+}
+
+#professor-ask-root * { box-sizing: border-box; }
+
+.pa-card {
+  background: #181818;
+  border: 1px solid #303030;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pa-header {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid #303030;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pa-title { font-size: 16px; font-weight: 700; }
+.pa-subtitle { color: #aaa; font-size: 12px; margin-top: 2px; }
+.pa-status { display: flex; align-items: center; gap: 6px; color: #aaa; font-size: 12px; }
+.pa-dot { width: 8px; height: 8px; border-radius: 999px; background: #777; }
+.pa-dot.ok { background: #2ba640; }
+.pa-dot.warn { background: #d99a16; }
+
+.pa-toolbar {
+  padding: 9px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid #292929;
+}
+
+.pa-pill {
+  background: #272727;
+  border: 1px solid #3b3b3b;
+  color: #e8e8e8;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+button.pa-pill { cursor: pointer; }
+button.pa-pill:hover { background: #333; }
+
+.pa-messages {
+  flex: 1;
+  min-height: 230px;
+  max-height: 440px;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pa-empty {
+  color: #aaa;
+  text-align: center;
+  padding: 42px 18px;
+}
+
+.pa-msg {
+  max-width: 92%;
+  padding: 9px 11px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pa-msg.user { align-self: flex-end; background: #3a3a3a; }
+.pa-msg.assistant { align-self: flex-start; background: #242424; border: 1px solid #333; }
+.pa-msg.error { align-self: stretch; color: #ffb4b4; background: #3a2020; }
+.pa-msg-meta { color: #999; font-size: 11px; margin-bottom: 4px; }
+
+.pa-composer {
+  padding: 10px;
+  border-top: 1px solid #303030;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.pa-input {
+  flex: 1;
+  resize: vertical;
+  min-height: 42px;
+  max-height: 120px;
+  border: 1px solid #3c3c3c;
+  background: #101010;
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 11px;
+  outline: none;
+}
+.pa-input:focus { border-color: #666; }
+
+.pa-send {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 0;
+  background: #f1f1f1;
+  color: #111;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pa-send:disabled { opacity: .45; cursor: default; }
+
+.pa-connect {
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
