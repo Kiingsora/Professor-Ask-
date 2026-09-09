@@ -1,0 +1,19 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check JavaScript syntax
+        run: |
+          find bridge extension -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Validate extension manifest
+        run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
