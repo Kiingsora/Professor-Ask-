@@ -1,22 +1,8 @@
-const BRIDGE_ORIGINS = [
-  'http://127.0.0.1:43119',
-  'http://localhost:43119',
-];
+const NATIVE_HOST = 'com.professorask.bridge';
 
-const ALLOWED_BRIDGE_PATHS = new Set([
-  '/health',
-  '/account',
-  '/login',
-  '/chat',
-  '/providers/codex/status',
-  '/providers/codex/login',
-  '/providers/codex/logout',
-  '/providers/codex/models',
-  '/providers/antigravity/status',
-  '/providers/antigravity/login',
-  '/providers/antigravity/logout',
-  '/providers/antigravity/models',
-]);
+let nativePort = null;
+let nextNativeId = 1;
+const nativePending = new Map();
 
 chrome.action.onClicked.addListener(() => {
   chrome.runtime.openOptionsPage();
@@ -37,94 +23,146 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // Compatibility layer: content.js and options.js keep using BRIDGE_FETCH,
+  // but the transport is now Chrome Native Messaging instead of localhost HTTP.
   if (message?.type === 'BRIDGE_FETCH') {
-    proxyBridgeRequest(message)
+    proxyNativeRequest(message)
       .then(sendResponse)
       .catch(error => sendResponse({
         ok: false,
         status: 0,
         data: null,
-        error: error.message || String(error),
+        error: friendlyNativeError(error?.message || String(error)),
       }));
     return true;
   }
 });
 
-function validateBridgePath(rawPath) {
-  const path = typeof rawPath === 'string' ? rawPath : '';
-  let parsed;
-  try {
-    parsed = new URL(path, BRIDGE_ORIGINS[0]);
-  } catch {
-    return { ok: false, error: 'Route bridge invalide.' };
+function friendlyNativeError(message) {
+  const text = String(message || '');
+  if (/native messaging host.*not found|specified native messaging host not found/i.test(text)) {
+    return 'Professor Ask Companion n’est pas installé. Lance une seule fois “native-host/Installer Professor Ask.vbs”, puis actualise l’extension.';
   }
-
-  if (!ALLOWED_BRIDGE_PATHS.has(parsed.pathname)) {
-    return { ok: false, error: 'Route bridge non autorisée.' };
+  if (/access.*native messaging|not allowed to access native messaging/i.test(text)) {
+    return 'Chrome refuse l’accès au companion Professor Ask. Réinstalle le companion puis actualise l’extension.';
   }
-
-  return { ok: true, pathname: parsed.pathname, search: parsed.search };
+  if (/disconnected|native host has exited|communication with the native messaging host/i.test(text)) {
+    return 'Professor Ask Companion s’est arrêté. Consulte native-host/native-host.log si le problème persiste.';
+  }
+  return text || 'Professor Ask Companion indisponible.';
 }
 
-async function proxyBridgeRequest(message) {
-  const validated = validateBridgePath(message.path);
-  if (!validated.ok) {
-    return { ok: false, status: 400, data: null, error: validated.error };
+function failNativePending(error) {
+  const message = friendlyNativeError(error);
+  for (const pending of nativePending.values()) {
+    clearTimeout(pending.timer);
+    pending.reject(new Error(message));
   }
+  nativePending.clear();
+}
 
-  const method = String(message.method || 'GET').toUpperCase();
-  if (!['GET', 'POST'].includes(method)) {
-    return { ok: false, status: 405, data: null, error: 'Méthode bridge non autorisée.' };
-  }
+function ensureNativePort() {
+  if (nativePort) return nativePort;
 
-  const init = {
-    method,
-    cache: 'no-store',
-    credentials: 'omit',
-    headers: { Accept: 'application/json' },
-  };
+  const port = chrome.runtime.connectNative(NATIVE_HOST);
+  nativePort = port;
 
-  if (method === 'POST' && message.body !== undefined) {
-    init.headers['Content-Type'] = 'application/json';
-    init.body = JSON.stringify(message.body);
-  }
+  port.onMessage.addListener(message => {
+    const id = String(message?.id ?? '');
+    const pending = nativePending.get(id);
+    if (!pending) return;
 
-  const errors = [];
+    nativePending.delete(id);
+    clearTimeout(pending.timer);
 
-  for (const origin of BRIDGE_ORIGINS) {
-    const url = `${origin}${validated.pathname}${validated.search}`;
-    let response;
+    if (message?.ok) pending.resolve(message.data);
+    else pending.reject(new Error(message?.error || 'Erreur du companion Professor Ask.'));
+  });
+
+  port.onDisconnect.addListener(() => {
+    const lastError = chrome.runtime.lastError?.message || 'Native Messaging déconnecté.';
+    if (nativePort === port) nativePort = null;
+    failNativePending(lastError);
+  });
+
+  return port;
+}
+
+function nativeRequest(payload, timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    const id = String(nextNativeId++);
+    const port = ensureNativePort();
+    const timer = setTimeout(() => {
+      nativePending.delete(id);
+      reject(new Error(`Timeout du companion Professor Ask sur ${payload.action || 'requête'}.`));
+    }, timeoutMs);
+
+    nativePending.set(id, { resolve, reject, timer });
 
     try {
-      response = await fetch(url, init);
+      port.postMessage({ id, ...payload });
     } catch (error) {
-      errors.push(`${origin}: ${error.message || error}`);
-      continue;
+      clearTimeout(timer);
+      nativePending.delete(id);
+      reject(error);
     }
+  });
+}
 
-    let data = null;
-    const text = await response.text();
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { raw: text };
-      }
-    }
+function requestFromLegacyPath(message) {
+  const rawPath = typeof message.path === 'string' ? message.path : '';
+  let pathname;
+  try {
+    pathname = new URL(rawPath, 'https://professor-ask.invalid').pathname;
+  } catch {
+    throw new Error('Route Professor Ask invalide.');
+  }
 
+  if (pathname === '/health') return { action: 'health', timeoutMs: 10000 };
+  if (pathname === '/account') return { action: 'provider.status', provider: 'codex', timeoutMs: 30000 };
+  if (pathname === '/login') return { action: 'provider.login', provider: 'codex', timeoutMs: 60000 };
+
+  const providerRoute = pathname.match(/^\/providers\/(codex|antigravity)\/(status|models|login|logout)$/);
+  if (providerRoute) {
+    const [, provider, operation] = providerRoute;
+    const timeoutMs = operation === 'login' ? 60000 : (operation === 'models' ? 45000 : 30000);
     return {
-      ok: response.ok,
-      status: response.status,
-      data,
-      bridgeOrigin: origin,
-      error: response.ok ? null : (data?.error || `Erreur bridge HTTP ${response.status}`),
+      action: `provider.${operation}`,
+      provider,
+      timeoutMs,
     };
   }
 
-  return {
-    ok: false,
-    status: 0,
-    data: null,
-    error: `Bridge local inaccessible. Tentatives: ${errors.join(' | ')}`,
-  };
+  if (pathname === '/chat') {
+    return {
+      action: 'chat',
+      payload: message.body || {},
+      timeoutMs: 210000,
+    };
+  }
+
+  throw new Error('Route Professor Ask non autorisée.');
+}
+
+async function proxyNativeRequest(message) {
+  try {
+    const mapped = requestFromLegacyPath(message);
+    const { timeoutMs, ...payload } = mapped;
+    const data = await nativeRequest(payload, timeoutMs);
+    return {
+      ok: true,
+      status: 200,
+      data,
+      transport: 'chrome-native-messaging',
+      error: null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      transport: 'chrome-native-messaging',
+      error: friendlyNativeError(error?.message || String(error)),
+    };
+  }
 }
