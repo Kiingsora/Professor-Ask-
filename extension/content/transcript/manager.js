@@ -12,10 +12,11 @@
     return language === 'fr' || language === 'en' ? language : 'auto';
   }
 
-  function applyTranscript(segments, source, status) {
+  function applyTranscript(segments, source, status, diagnostics = null) {
     PA.state.transcript = Array.isArray(segments) ? segments : [];
     PA.state.transcriptSource = source;
-    PA.setTranscriptStatus(status, 100);
+    PA.state.transcriptDiagnostics = diagnostics || null;
+    PA.setTranscriptStatus(status, 100, null, diagnostics);
   }
 
   async function waitForGeneratedTranscript(videoId, language, generation, initial) {
@@ -23,7 +24,11 @@
 
     while (generation === loadGeneration && PA.state.videoId === videoId) {
       if (snapshot?.status === 'ready' && Array.isArray(snapshot.segments)) {
-        applyTranscript(snapshot.segments, 'generated', 'generated-ready');
+        if (!snapshot.segments.length) {
+          PA.setTranscriptStatus('failed', 100, 'Whisper a terminé sans produire de segments exploitables.');
+          return;
+        }
+        applyTranscript(snapshot.segments, 'generated', 'generated-ready', snapshot.diagnostics || null);
         return;
       }
 
@@ -60,20 +65,27 @@
     return PA.state.transcript.filter(item => item.start <= end && (item.start + item.duration) >= start);
   };
 
+  PA.hasTranscriptAt = function hasTranscriptAt(time) {
+    return PA.transcriptContextAt(time).length > 0;
+  };
+
   PA.loadTranscript = async function loadTranscript() {
     const generation = ++loadGeneration;
     const videoId = PA.state.videoId;
 
     PA.state.transcript = [];
     PA.state.transcriptSource = null;
+    PA.state.transcriptDiagnostics = null;
     PA.setTranscriptStatus('checking-youtube');
 
     try {
-      const transcript = await PA.fetchYoutubeTranscript();
+      const result = await PA.fetchYoutubeTranscript();
       if (generation !== loadGeneration || PA.state.videoId !== videoId) return;
-      if (!transcript.length) throw new Error('empty captions');
+      const transcript = Array.isArray(result) ? result : result?.segments;
+      const diagnostics = Array.isArray(result) ? null : result?.diagnostics;
+      if (!transcript?.length) throw new Error('empty captions');
 
-      applyTranscript(transcript, 'youtube', 'youtube-ready');
+      applyTranscript(transcript, 'youtube', 'youtube-ready', diagnostics || null);
       return;
     } catch {
       if (generation !== loadGeneration || PA.state.videoId !== videoId) return;
