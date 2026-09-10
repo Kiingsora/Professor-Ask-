@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Professor Ask — Paramètres</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="settings-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Professor Ask</p>
+        <h1>Paramètres</h1>
+        <p class="lede">Connecte ton fournisseur, choisis le modèle utilisé et règle le contexte envoyé depuis YouTube.</p>
+      </div>
+      <div class="save-state" id="save-state">Enregistré</div>
+    </header>
+
+    <section class="settings-section">
+      <div class="section-heading"><div><h2>Fournisseur IA</h2><p>Codex se connecte directement depuis Chrome. Antigravity reste séparé tant que Google ne publie pas de flux OAuth tiers équivalent.</p></div></div>
+      <div class="provider-grid">
+        <label class="provider-card" data-provider-card="codex">
+          <input type="radio" name="provider" value="codex" />
+          <div class="provider-card-main"><div class="provider-icon">C</div><div><strong>Codex</strong><span>OAuth ChatGPT direct · aucune installation</span></div></div>
+          <div class="provider-status muted" id="codex-status">Vérification…</div>
+        </label>
+        <label class="provider-card" data-provider-card="antigravity">
+          <input type="radio" name="provider" value="antigravity" />
+          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>Compte Google · client local encore requis</span></div></div>
+          <div class="provider-status muted" id="antigravity-status">Vérification…</div>
+        </label>
+      </div>
+
+      <div class="connection-panel connection-stack" id="codex-panel">
+        <div class="connection-copy"><strong>Compte ChatGPT / Codex</strong><p>Un clic ouvre l’autorisation OpenAI dans un nouvel onglet. Professor Ask utilise ensuite directement la session OAuth Codex liée à ton forfait ChatGPT, sans CLI, bridge, port local ni terminal.</p></div>
+        <div class="connection-actions">
+          <button class="button primary" id="connect-codex">Se connecter avec ChatGPT</button>
+          <button class="button" id="refresh-codex">Actualiser</button>
+          <button class="button" id="logout-codex">Déconnecter</button>
+        </div>
+        <div class="settings-grid full-grid provider-model-grid">
+          <label class="field"><span>Modèle Codex</span><select id="codex-model"><option value="auto">Automatique</option></select><small>Le catalogue est récupéré directement depuis le compte Codex connecté.</small></label>
+          <label class="field"><span>Effort de raisonnement</span><select id="codex-effort"><option value="auto">Automatique</option></select><small>Les niveaux affichés dépendent du modèle sélectionné.</small></label>
+        </div>
+      </div>
+
+      <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
+        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>Google documente actuellement l’authentification du quota Antigravity au travers de son client <code>agy</code>. Professor Ask ne remplace pas ce flux par un OAuth Gemini API, qui utilise un quota différent.</p></div>
+        <div class="connection-actions">
+          <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
+          <button class="button" id="refresh-antigravity">Actualiser</button>
+          <button class="button" id="logout-antigravity">Déconnecter</button>
+          <button class="button" id="open-antigravity-docs">Documentation Antigravity</button>
+        </div>
+        <div class="settings-grid full-grid provider-model-grid">
+          <label class="field"><span>Modèle Antigravity</span><select id="antigravity-model"><option value="auto">Automatique</option></select><small>La liste vient du compte Antigravity lorsqu’un client local est disponible.</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading"><div><h2>Réponses de l’IA</h2><p>Détermine comment Professor Ask formule et vérifie ses réponses.</p></div></div>
+      <div class="settings-grid">
+        <label class="field"><span>Langue des réponses</span><select id="response-language"><option value="auto">Automatique</option><option value="fr">Français</option><option value="en">Anglais</option></select></label>
+        <label class="field"><span>Niveau de détail</span><select id="response-style"><option value="concise">Concis</option><option value="balanced">Équilibré</option><option value="detailed">Détaillé</option></select></label>
+        <label class="field"><span>Recherche web</span><select id="web-search"><option value="auto">Automatique si nécessaire</option><option value="always">Toujours vérifier si pertinent</option><option value="off">Désactivée</option></select></label>
+        <label class="toggle-row"><div><span>Mettre la vidéo en pause quand j’envoie une question</span><small>Fige le moment exact utilisé comme contexte.</small></div><input type="checkbox" id="pause-on-question" /></label>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading"><div><h2>Contexte vidéo</h2><p>Contrôle la quantité de transcription envoyée avec chaque question.</p></div></div>
+      <div class="settings-grid">
+        <label class="field"><span>Fenêtre de contexte autour du timestamp</span><select id="context-seconds"><option value="60">± 1 minute</option><option value="180">± 3 minutes</option><option value="300">± 5 minutes</option><option value="600">± 10 minutes</option></select></label>
+        <label class="field"><span>Langue de transcription préférée</span><select id="transcript-language"><option value="auto">Automatique</option><option value="fr">Français en priorité</option><option value="en">Anglais en priorité</option></select></label>
+        <label class="toggle-row"><div><span>Inclure le titre et la chaîne</span><small>Ajoute les métadonnées de la vidéo au contexte.</small></div><input type="checkbox" id="include-metadata" /></label>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <div class="section-heading"><div><h2>Interface</h2><p>Adapte le panneau Professor Ask à ton usage.</p></div></div>
+      <div class="settings-grid">
+        <label class="field"><span>Thème du panneau</span><select id="theme"><option value="auto">Suivre YouTube</option><option value="dark">Sombre</option><option value="light">Clair</option></select></label>
+        <label class="field"><span>Hauteur du chat</span><select id="panel-size"><option value="compact">Compacte</option><option value="standard">Standard</option><option value="large">Grande</option></select></label>
+      </div>
+    </section>
+
+    <section class="settings-section danger-zone">
+      <div class="section-heading"><div><h2>Historique et confidentialité</h2><p>Les conversations de l’extension restent stockées localement.</p></div></div>
+      <div class="settings-grid">
+        <label class="toggle-row"><div><span>Mémoriser les conversations par vidéo</span><small>Retrouve la discussion quand tu reviens sur la vidéo.</small></div><input type="checkbox" id="remember-history" /></label>
+        <label class="field"><span>Messages conservés par vidéo</span><select id="history-limit"><option value="10">10 messages</option><option value="30">30 messages</option><option value="50">50 messages</option></select></label>
+      </div>
+      <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
+    </section>
+
+    <footer class="footer-note"><span>Codex : <code>OAuth direct dans Chrome</code></span><span>Professor Ask v0.7.0</span></footer>
+  </main>
+  <script type="module" src="index.js"></script>
+</body>
+</html>

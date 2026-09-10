@@ -1,0 +1,32 @@
+import { $, openExternal, store } from './core.js';
+import { updateCodexEfforts } from './form.js';
+import { connectProvider, logoutProvider, refreshProvider } from './providers.js';
+import { clearHistory, loadSettings, resetSettings, scheduleSave } from './storage.js';
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadSettings();
+  await Promise.all([
+    refreshProvider('codex').catch(() => false),
+    refreshProvider('antigravity').catch(() => false),
+  ]);
+
+  document.querySelectorAll('select, input[type="checkbox"], input[name="provider"]').forEach(control => {
+    control.addEventListener('change', () => {
+      if (control.id === 'codex-model') {
+        store.settings.codexModel = control.value;
+        updateCodexEfforts();
+      }
+      scheduleSave();
+    });
+  });
+
+  $('connect-codex').addEventListener('click', () => connectProvider('codex'));
+  $('refresh-codex').addEventListener('click', () => refreshProvider('codex'));
+  $('logout-codex').addEventListener('click', () => logoutProvider('codex'));
+  $('connect-antigravity').addEventListener('click', () => connectProvider('antigravity'));
+  $('refresh-antigravity').addEventListener('click', () => refreshProvider('antigravity'));
+  $('logout-antigravity').addEventListener('click', () => logoutProvider('antigravity'));
+  $('open-antigravity-docs').addEventListener('click', () => openExternal('https://antigravity.google/docs/cli/install/'));
+  $('clear-history').addEventListener('click', clearHistory);
+  $('reset-settings').addEventListener('click', resetSettings);
+});
