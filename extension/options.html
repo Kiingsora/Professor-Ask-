@@ -21,7 +21,7 @@
       <div class="section-heading">
         <div>
           <h2>Fournisseur IA</h2>
-          <p>Chaque fournisseur gère sa propre authentification et expose les modèles disponibles sur ton compte.</p>
+          <p>Codex se connecte directement depuis Chrome. Antigravity reste séparé tant que Google ne publie pas de flux OAuth tiers équivalent.</p>
         </div>
       </div>
 
@@ -32,7 +32,7 @@
             <div class="provider-icon">C</div>
             <div>
               <strong>Codex</strong>
-              <span>OAuth ChatGPT / compte Codex</span>
+              <span>OAuth ChatGPT direct · aucune installation</span>
             </div>
           </div>
           <div class="provider-status muted" id="codex-status">Vérification…</div>
@@ -44,7 +44,7 @@
             <div class="provider-icon">A</div>
             <div>
               <strong>Antigravity</strong>
-              <span>OAuth Google / compte Antigravity</span>
+              <span>Compte Google · client local encore requis</span>
             </div>
           </div>
           <div class="provider-status muted" id="antigravity-status">Vérification…</div>
@@ -54,7 +54,7 @@
       <div class="connection-panel connection-stack" id="codex-panel">
         <div class="connection-copy">
           <strong>Compte ChatGPT / Codex</strong>
-          <p>Professor Ask demande à Codex de démarrer son OAuth officiel, puis ouvre directement la page de connexion dans un nouvel onglet Chrome. Les identifiants restent gérés par Codex.</p>
+          <p>Un clic ouvre l’autorisation OpenAI dans un nouvel onglet. Professor Ask utilise ensuite directement la session OAuth Codex liée à ton forfait ChatGPT, sans CLI, bridge, port local ni terminal.</p>
         </div>
 
         <div class="connection-actions">
@@ -69,7 +69,7 @@
             <select id="codex-model">
               <option value="auto">Automatique</option>
             </select>
-            <small>La liste est récupérée directement depuis Codex pour ton compte.</small>
+            <small>Le catalogue est récupéré directement depuis le compte Codex connecté.</small>
           </label>
 
           <label class="field">
@@ -85,14 +85,14 @@
       <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
         <div class="connection-copy">
           <strong>Compte Google Antigravity</strong>
-          <p>Professor Ask utilise le client officiel Antigravity. S’il n’existe aucune session enregistrée, Antigravity déclenche son OAuth Google dans le navigateur et conserve la session dans le gestionnaire d’identifiants Windows.</p>
+          <p>Google documente actuellement l’authentification du quota Antigravity au travers de son client <code>agy</code>. Professor Ask ne remplace pas ce flux par un faux OAuth Gemini API, car ce dernier utilise un projet Google Cloud et un quota différent.</p>
         </div>
 
         <div class="connection-actions">
           <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
           <button class="button" id="refresh-antigravity">Actualiser</button>
           <button class="button" id="logout-antigravity">Déconnecter</button>
-          <button class="button" id="open-antigravity-docs">Installer Antigravity</button>
+          <button class="button" id="open-antigravity-docs">Documentation Antigravity</button>
         </div>
 
         <div class="settings-grid full-grid provider-model-grid">
@@ -101,7 +101,7 @@
             <select id="antigravity-model">
               <option value="auto">Automatique</option>
             </select>
-            <small>La liste vient d’Antigravity et peut inclure Gemini, Claude et les autres modèles accessibles à ton compte.</small>
+            <small>La liste vient du compte Antigravity lorsqu’un client local est disponible.</small>
           </label>
         </div>
       </div>
@@ -254,8 +254,8 @@
     </section>
 
     <footer class="footer-note">
-      <span>Transport : <code>Chrome Native Messaging</code></span>
-      <span>Professor Ask v0.5.1</span>
+      <span>Codex : <code>OAuth direct dans Chrome</code></span>
+      <span>Professor Ask v0.6.0</span>
     </footer>
   </main>
 
