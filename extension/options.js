@@ -17,6 +17,14 @@
     historyLimit: 30,
   };
 
+  const CODEX_SPARK_MODEL = {
+    id: 'gpt-5.3-codex-spark',
+    label: 'GPT-5.3 Codex Spark',
+    isDefault: false,
+    defaultEffort: null,
+    efforts: [],
+  };
+
   const $ = id => document.getElementById(id);
   let settings = { ...DEFAULTS };
   let saveTimer = null;
@@ -128,8 +136,16 @@
     el.className = `provider-status ${kind}`.trim();
   }
 
+  function normalizeModelCatalog(provider, models) {
+    const catalog = Array.isArray(models) ? [...models] : [];
+    if (provider === 'codex' && !catalog.some(model => model?.id === CODEX_SPARK_MODEL.id)) {
+      catalog.unshift({ ...CODEX_SPARK_MODEL });
+    }
+    return catalog;
+  }
+
   function populateModels(provider, models) {
-    modelCatalogs[provider] = Array.isArray(models) ? models : [];
+    modelCatalogs[provider] = normalizeModelCatalog(provider, models);
     const select = $(provider === 'codex' ? 'codex-model' : 'antigravity-model');
     const savedValue = provider === 'codex' ? settings.codexModel : settings.antigravityModel;
     select.innerHTML = '<option value="auto">Automatique</option>';
