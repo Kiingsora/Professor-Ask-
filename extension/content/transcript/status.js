@@ -16,6 +16,13 @@
     return parts.join(' · ');
   }
 
+  function rangeLabel(details) {
+    const first = Number(details?.first_timestamp);
+    const last = Number(details?.last_timestamp);
+    if (!Number.isFinite(first) || !Number.isFinite(last)) return '';
+    return `${PA.fmt(first)}–${PA.fmt(last)}`;
+  }
+
   PA.setTranscriptStatus = function setTranscriptStatus(status, progress = null, error = null, diagnostics = null) {
     PA.state.transcriptStatus = status;
     PA.state.transcriptProgress = Number.isFinite(Number(progress)) ? Number(progress) : null;
@@ -34,12 +41,14 @@
     else if (status === 'downloading') badge.textContent = `Préparation audio ${Math.round(PA.state.transcriptProgress || 0)} %`;
     else if (status === 'transcribing') badge.textContent = `Transcription IA ${Math.round(PA.state.transcriptProgress || 0)} %`;
     else if (status === 'generated-ready') {
-      const range = Number.isFinite(Number(details?.last_timestamp)) ? ` · ${PA.fmt(details.last_timestamp)}` : '';
-      const count = details?.segment_count ? ` · ${details.segment_count} segments` : '';
-      badge.textContent = `Transcription IA prête${count}${range}`;
+      const range = rangeLabel(details);
+      const count = details?.segment_count ? `${details.segment_count} segments` : '';
+      const suffix = [count, range].filter(Boolean).join(' · ');
+      badge.textContent = `Transcription IA prête${suffix ? ` · ${suffix}` : ''}`;
     } else if (status === 'failed') badge.textContent = 'Transcription indisponible';
     else badge.textContent = 'Transcription…';
 
-    badge.title = error || describeDiagnostics(details);
+    const diagnosticText = error || describeDiagnostics(details);
+    badge.title = [diagnosticText, 'Cliquer pour vérifier le texte autour du moment actuel.'].filter(Boolean).join('\n');
   };
 })();
