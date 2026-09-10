@@ -7,6 +7,26 @@ export function formatTime(value) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function transcriptSourceLabel(payload) {
+  if (payload.transcriptSource === 'generated') return 'Whisper / transcription IA horodatée';
+  if (payload.transcriptSource === 'youtube') {
+    const kind = payload.transcriptDiagnostics?.source_kind;
+    if (kind === 'manual') return 'Sous-titres YouTube manuels';
+    if (kind === 'automatic') return 'Sous-titres automatiques YouTube';
+    return 'Sous-titres YouTube';
+  }
+  return 'Inconnue';
+}
+
+function transcriptCoverage(payload) {
+  const diagnostics = payload.transcriptDiagnostics;
+  if (!diagnostics) return '(non renseignée)';
+  const first = Number(diagnostics.first_timestamp);
+  const last = Number(diagnostics.last_timestamp);
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return '(non renseignée)';
+  return `${formatTime(first)} à ${formatTime(last)}`;
+}
+
 export function buildProfessorPrompt(payload) {
   const transcript = (payload.transcript || [])
     .map(segment => `[${formatTime(segment.start)}] ${String(segment.text || '').trim()}`)
@@ -32,5 +52,6 @@ export function buildProfessorPrompt(payload) {
     auto: 'Utilise la recherche web lorsque la vidéo ne suffit pas, lorsqu’une information est récente ou lorsqu’une vérification externe améliore la précision.',
   }[settings.webSearch] || 'Utilise le web lorsque cela améliore réellement la précision.';
 
-  return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || '(non envoyé)'}\nChaîne: ${payload.channel || '(non envoyée)'}\nPosition actuelle: ${formatTime(payload.timestamp)}\n\nTRANSCRIPTION AUTOUR DU MOMENT ACTUEL\n${transcript || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Prends la transcription et le timestamp comme contexte principal.\n- Explique clairement ce qui est dit ou sous-entendu autour du moment actuel.\n- Distingue ce qui vient de la vidéo de ce qui vient d’informations externes.\n- ${webInstruction}\n- ${styleInstruction}\n- ${languageInstruction}`;
+  const timestamp = formatTime(payload.timestamp);
+  return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || '(non envoyé)'}\nChaîne: ${payload.channel || '(non envoyée)'}\nPosition actuelle exacte fournie par l'extension: ${timestamp}\nSource de transcription: ${transcriptSourceLabel(payload)}\nCouverture connue de la transcription: ${transcriptCoverage(payload)}\n\nTRANSCRIPTION HORODATÉE AUTOUR DU MOMENT ACTUEL\n${transcript || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Le timestamp actuel est explicitement fourni ci-dessus : ${timestamp}. Ne dis pas que tu ne l'as pas reçu.\n- Les nombres entre crochets dans la transcription sont les timestamps réels de la vidéo.\n- Pour toute affirmation sur ce qui est dit dans la vidéo, appuie-toi sur la transcription horodatée fournie.\n- Si la transcription ne contient pas l'information demandée, dis-le au lieu de l'inventer.\n- Distingue clairement ce qui vient de la vidéo de ce qui vient d’informations externes.\n- ${webInstruction}\n- ${styleInstruction}\n- ${languageInstruction}`;
 }
