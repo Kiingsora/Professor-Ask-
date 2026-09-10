@@ -1,5 +1,29 @@
 importScripts('codex-direct.js');
 
+// Codex's hosted web-search wire format carries an explicit external_web_access
+// flag. Keep this small compatibility normalization at the transport boundary so
+// the provider module can expose the simple { type: 'web_search' } abstraction.
+const professorAskNativeFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = (input, init = {}) => {
+  const url = typeof input === 'string' ? input : input?.url || '';
+  if (url === 'https://chatgpt.com/backend-api/codex/responses' && typeof init?.body === 'string') {
+    try {
+      const body = JSON.parse(init.body);
+      if (Array.isArray(body.tools)) {
+        body.tools = body.tools.map(tool => (
+          tool?.type === 'web_search' && tool.external_web_access === undefined
+            ? { ...tool, external_web_access: true }
+            : tool
+        ));
+        init = { ...init, body: JSON.stringify(body) };
+      }
+    } catch {
+      // Let the original request surface its own validation error.
+    }
+  }
+  return professorAskNativeFetch(input, init);
+};
+
 const NATIVE_HOST = 'com.professorask.bridge';
 let nativePort = null;
 let nextNativeId = 1;
@@ -55,7 +79,7 @@ async function routeRequest(message) {
   try {
     if (pathname === '/health') {
       return okResponse({
-        version: '0.6.2',
+        version: '0.6.3',
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
