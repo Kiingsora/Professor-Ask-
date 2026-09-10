@@ -13,7 +13,10 @@ const ProfessorAskCodex = (() => {
   const AUTH_KEY = 'codex-auth-v1';
   const PENDING_KEY = 'codex-pending-v1';
   const REFRESH_SKEW_MS = 5 * 60 * 1000;
+  const MODEL_CACHE_MS = 5 * 60 * 1000;
+
   let dbPromise = null;
+  let modelCache = { at: 0, models: [] };
 
   function openSecretsDb() {
     if (dbPromise) return dbPromise;
@@ -109,9 +112,11 @@ const ProfessorAskCodex = (() => {
     const nested = data?.error;
     if (typeof nested === 'string') return nested;
     if (nested?.message) return nested.message;
+    if (nested?.code && nested?.type) return `${nested.type}: ${nested.code}`;
     if (data?.error_description) return data.error_description;
     if (data?.message) return data.message;
-    if (data?.raw) return String(data.raw).slice(0, 500);
+    if (data?.detail) return typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail).slice(0, 700);
+    if (data?.raw) return String(data.raw).slice(0, 700);
     return fallback;
   }
 
@@ -125,7 +130,6 @@ const ProfessorAskCodex = (() => {
     const data = await parseResponse(response);
     if (!response.ok) throw new Error(responseError(data, `OpenAI a refusé la demande de connexion (${response.status}).`));
 
-    // OpenAI returns device_auth_id + user_code + interval. The verification URL is fixed.
     const deviceAuthId = data.device_auth_id;
     const userCode = data.user_code;
     const authUrl = data.verification_uri_complete || data.verification_uri || CODEX_DEVICE_URL;
@@ -178,6 +182,7 @@ const ProfessorAskCodex = (() => {
     };
     await secretSet(AUTH_KEY, auth);
     await secretDelete(PENDING_KEY);
+    modelCache = { at: 0, models: [] };
     return auth;
   }
 
@@ -230,6 +235,7 @@ const ProfessorAskCodex = (() => {
       if ([400, 401, 403].includes(response.status)) await secretDelete(AUTH_KEY);
       throw new Error(responseError(data, `Actualisation OAuth Codex impossible (${response.status}).`));
     }
+
     const updated = {
       ...auth,
       accessToken: data.access_token || auth.accessToken,
@@ -292,11 +298,16 @@ const ProfessorAskCodex = (() => {
 
   async function logout() {
     await Promise.all([secretDelete(AUTH_KEY), secretDelete(PENDING_KEY)]);
+    modelCache = { at: 0, models: [] };
     return { connected: false };
   }
 
   function authHeaders(auth) {
-    const headers = { 'Authorization': `Bearer ${auth.accessToken}`, 'Accept': 'application/json' };
+    const headers = {
+      'Authorization': `Bearer ${auth.accessToken}`,
+      'Accept': 'application/json',
+      'originator': 'professor-ask',
+    };
     const account = accountInfo(auth);
     if (account.account_id) headers['ChatGPT-Account-Id'] = account.account_id;
     return headers;
@@ -331,12 +342,16 @@ const ProfessorAskCodex = (() => {
     }).filter(Boolean))];
   }
 
-  async function models() {
+  async function models({ force = false } = {}) {
+    if (!force && modelCache.models.length && Date.now() - modelCache.at < MODEL_CACHE_MS) {
+      return { models: modelCache.models };
+    }
+
     const response = await authorizedFetch(MODELS_URL, { method: 'GET' });
     const data = await parseResponse(response);
     if (!response.ok) throw new Error(responseError(data, `Impossible de récupérer les modèles Codex (${response.status}).`));
     const entries = Array.isArray(data?.models) ? data.models : [];
-    const models = entries
+    const result = entries
       .filter(item => item && (item.slug || item.id || item.model))
       .filter(item => !['hide', 'hidden'].includes(String(item.visibility || '').toLowerCase()))
       .sort((a, b) => (Number(a.priority) || 10000) - (Number(b.priority) || 10000))
@@ -350,7 +365,18 @@ const ProfessorAskCodex = (() => {
           efforts: normalizeEfforts(item),
         };
       });
-    return { models };
+    modelCache = { at: Date.now(), models: result };
+    return { models: result };
+  }
+
+  async function resolveModel(selected) {
+    if (selected && selected !== 'auto') return selected;
+    try {
+      const catalog = (await models()).models;
+      return catalog.find(item => item.isDefault)?.id || catalog[0]?.id || 'gpt-5.6-sol';
+    } catch {
+      return 'gpt-5.6-sol';
+    }
   }
 
   function formatTime(value) {
@@ -363,11 +389,27 @@ const ProfessorAskCodex = (() => {
   }
 
   function buildPrompt(payload) {
-    const transcript = (payload.transcript || []).map(seg => `[${formatTime(seg.start)}] ${String(seg.text || '').trim()}`).filter(Boolean).join('\n');
+    const transcript = (payload.transcript || [])
+      .map(seg => `[${formatTime(seg.start)}] ${String(seg.text || '').trim()}`)
+      .filter(Boolean)
+      .join('\n');
     const settings = payload.settings || {};
-    const languageInstruction = { fr: 'Réponds en français.', en: 'Answer in English.', auto: 'Réponds dans la langue utilisée par l’utilisateur.' }[settings.responseLanguage] || 'Réponds dans la langue utilisée par l’utilisateur.';
-    const styleInstruction = { concise: 'Sois concis et va directement à l’explication utile.', balanced: 'Donne une réponse claire, structurée et de longueur modérée.', detailed: 'Donne une réponse détaillée avec le contexte et les nuances utiles.' }[settings.responseStyle] || 'Donne une réponse claire, structurée et de longueur modérée.';
-    const webInstruction = { off: 'N’utilise pas la recherche web.', always: 'Quand un fait est vérifiable, actuel ou externe à la vidéo, vérifie-le avec le web si le fournisseur dispose d’un outil de recherche, puis cite les sources utiles.', auto: 'Utilise le web lorsque la vidéo ne suffit pas, lorsqu’une information est récente ou lorsqu’une vérification externe améliore la précision.' }[settings.webSearch] || 'Utilise le web lorsque cela améliore réellement la précision.';
+    const languageInstruction = {
+      fr: 'Réponds en français.',
+      en: 'Answer in English.',
+      auto: 'Réponds dans la langue utilisée par l’utilisateur.',
+    }[settings.responseLanguage] || 'Réponds dans la langue utilisée par l’utilisateur.';
+    const styleInstruction = {
+      concise: 'Sois concis et va directement à l’explication utile.',
+      balanced: 'Donne une réponse claire, structurée et de longueur modérée.',
+      detailed: 'Donne une réponse détaillée avec le contexte et les nuances utiles.',
+    }[settings.responseStyle] || 'Donne une réponse claire, structurée et de longueur modérée.';
+    const webInstruction = {
+      off: 'N’utilise pas la recherche web.',
+      always: 'Utilise la recherche web pour vérifier les faits externes ou actuels pertinents et cite les sources utiles.',
+      auto: 'Utilise la recherche web lorsque la vidéo ne suffit pas, lorsqu’une information est récente ou lorsqu’une vérification externe améliore la précision.',
+    }[settings.webSearch] || 'Utilise le web lorsque cela améliore réellement la précision.';
+
     return `Tu es Professor Ask, un assistant pédagogique intégré à YouTube.\n\nVIDEO\nTitre: ${payload.title || '(non envoyé)'}\nChaîne: ${payload.channel || '(non envoyée)'}\nPosition actuelle: ${formatTime(payload.timestamp)}\n\nTRANSCRIPTION AUTOUR DU MOMENT ACTUEL\n${transcript || '(Aucune transcription disponible)'}\n\nQUESTION DE L'UTILISATEUR\n${payload.question}\n\nINSTRUCTIONS\n- Prends la transcription et le timestamp comme contexte principal.\n- Explique clairement ce qui est dit ou sous-entendu autour du moment actuel.\n- Distingue ce qui vient de la vidéo de ce qui vient d’informations externes.\n- ${webInstruction}\n- ${styleInstruction}\n- ${languageInstruction}`;
   }
 
@@ -384,29 +426,93 @@ const ProfessorAskCodex = (() => {
     return chunks.join('').trim();
   }
 
+  function parseSseText(text) {
+    let answer = '';
+    let completedResponse = null;
+    let streamError = null;
+
+    for (const block of String(text || '').split(/\r?\n\r?\n/)) {
+      const dataLines = block
+        .split(/\r?\n/)
+        .filter(line => line.startsWith('data:'))
+        .map(line => line.slice(5).trim());
+      if (!dataLines.length) continue;
+      const raw = dataLines.join('\n');
+      if (!raw || raw === '[DONE]') continue;
+
+      let event;
+      try { event = JSON.parse(raw); } catch { continue; }
+
+      if (event?.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+        answer += event.delta;
+      } else if (event?.type === 'response.completed' && event.response) {
+        completedResponse = event.response;
+      } else if (event?.type === 'response.failed' || event?.type === 'error') {
+        streamError = event.error?.message || event.message || event.response?.error?.message || 'La réponse Codex a échoué.';
+      }
+    }
+
+    if (!answer && completedResponse) answer = extractAnswerFromJson(completedResponse);
+    return { answer: answer.trim(), completedResponse, streamError };
+  }
+
+  async function parseCodexSuccess(response) {
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    const text = await response.text();
+
+    if (contentType.includes('text/event-stream') || /^data:/m.test(text)) {
+      const parsed = parseSseText(text);
+      if (parsed.streamError) throw new Error(parsed.streamError);
+      return parsed.answer;
+    }
+
+    if (!text) return '';
+    try { return extractAnswerFromJson(JSON.parse(text)); }
+    catch { return ''; }
+  }
+
   async function chat(payload) {
     const auth = await getValidAuth();
     if (!auth) throw new Error('Compte ChatGPT/Codex non connecté.');
-    const model = payload.settings?.codexModel && payload.settings.codexModel !== 'auto' ? payload.settings.codexModel : 'gpt-5.6-sol';
+
+    const model = await resolveModel(payload.settings?.codexModel);
     const effort = payload.settings?.codexEffort;
+    const webEnabled = payload.settings?.webSearch !== 'off';
     const body = {
       model,
       instructions: 'You are Professor Ask, an educational assistant for discussing the currently watched YouTube video. Follow the per-turn transcript, language, detail, and web-search instructions.',
-      input: [{ role: 'user', content: buildPrompt(payload) }],
+      input: [{
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: buildPrompt(payload) }],
+      }],
+      tools: webEnabled ? [{ type: 'web_search' }] : [],
+      tool_choice: 'auto',
+      parallel_tool_calls: true,
+      reasoning: effort && effort !== 'auto' ? { effort } : null,
       store: false,
-      stream: false,
+      stream: true,
+      include: ['reasoning.encrypted_content'],
     };
-    if (effort && effort !== 'auto') body.reasoning = { effort };
 
     const response = await authorizedFetch(`${CODEX_BASE_URL}/responses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
       body: JSON.stringify(body),
     });
-    const data = await parseResponse(response);
-    if (!response.ok) throw new Error(responseError(data, `Codex a refusé la requête (${response.status}).`));
-    const answer = extractAnswerFromJson(data);
-    if (!answer) throw new Error('Codex a répondu sans texte exploitable.');
+
+    if (!response.ok) {
+      const data = await parseResponse(response);
+      const requestId = response.headers.get('x-request-id') || response.headers.get('cf-ray');
+      const base = responseError(data, `Codex a refusé la requête (${response.status}).`);
+      throw new Error(requestId ? `${base} · requête ${requestId}` : base);
+    }
+
+    const answer = await parseCodexSuccess(response);
+    if (!answer) throw new Error('Codex a terminé la réponse sans texte exploitable.');
     return { answer, sources: [] };
   }
 
