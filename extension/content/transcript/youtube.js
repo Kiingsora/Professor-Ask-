@@ -25,7 +25,6 @@
         else if (char === '"') inString = false;
         continue;
       }
-
       if (char === '"') {
         inString = true;
         continue;
@@ -39,16 +38,33 @@
     return null;
   }
 
+  function languageScore(track, preferred, browserLanguage) {
+    const code = String(track.languageCode || '').toLowerCase();
+    if (preferred !== 'auto' && code.startsWith(preferred.toLowerCase())) return 40;
+    if (browserLanguage && code.startsWith(browserLanguage.toLowerCase())) return 30;
+    if (code.startsWith('fr')) return 20;
+    if (code.startsWith('en')) return 10;
+    return 0;
+  }
+
   function chooseTrack(tracks) {
     const preferred = PA.state.settings.transcriptLanguage;
-    if (preferred === 'fr') return tracks.find(track => /^fr([_-]|$)/i.test(track.languageCode)) || tracks[0];
-    if (preferred === 'en') return tracks.find(track => /^en([_-]|$)/i.test(track.languageCode)) || tracks[0];
-
     const browserLanguage = (navigator.language || '').split('-')[0];
-    return tracks.find(track => track.languageCode?.toLowerCase().startsWith(browserLanguage.toLowerCase()))
-      || tracks.find(track => /^fr([_-]|$)/i.test(track.languageCode))
-      || tracks.find(track => /^en([_-]|$)/i.test(track.languageCode))
-      || tracks[0];
+
+    return [...tracks]
+      .map((track, index) => ({
+        track,
+        index,
+        score: languageScore(track, preferred, browserLanguage) + (track.kind === 'asr' ? 0 : 100),
+      }))
+      .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.track || null;
+  }
+
+  function trackLabel(track) {
+    return track?.name?.simpleText
+      || track?.name?.runs?.map(run => run.text).join('')
+      || track?.languageCode
+      || null;
   }
 
   PA.fetchYoutubeTranscript = async function fetchYoutubeTranscript() {
@@ -62,8 +78,7 @@
 
     const separator = preferred.baseUrl.includes('?') ? '&' : '?';
     const data = await fetch(`${preferred.baseUrl}${separator}fmt=json3`, { credentials: 'include' }).then(response => response.json());
-
-    return (data.events || [])
+    const segments = (data.events || [])
       .filter(event => event.segs?.length)
       .map(event => ({
         start: (event.tStartMs || 0) / 1000,
@@ -71,5 +86,20 @@
         text: decodeHtml(event.segs.map(segment => segment.utf8 || '').join('').replace(/\n/g, ' ')).trim(),
       }))
       .filter(item => item.text);
+
+    if (!segments.length) throw new Error('empty captions');
+
+    const last = segments[segments.length - 1];
+    return {
+      segments,
+      diagnostics: {
+        segment_count: segments.length,
+        first_timestamp: segments[0].start,
+        last_timestamp: last.start + last.duration,
+        detected_language: preferred.languageCode || null,
+        source_kind: preferred.kind === 'asr' ? 'automatic' : 'manual',
+        track_label: trackLabel(preferred),
+      },
+    };
   };
 })();
