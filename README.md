@@ -2,116 +2,60 @@
 
 Professor Ask is a Chrome/Edge extension that adds an AI discussion panel next to a YouTube video.
 
-The assistant receives the current timestamp, the timestamped transcript around that moment, optional video metadata, and the user's question.
+The assistant receives the current timestamp, timestamped transcript context around that moment, optional video metadata, and the user's question.
 
-## UX goal
+## Provider architecture
 
-The end user must not have to start a local server, keep a terminal open, manage ports, or understand the provider CLIs.
+### Codex / ChatGPT — browser only
 
-Professor Ask therefore uses **Chrome Native Messaging** instead of a localhost HTTP bridge.
+Codex no longer needs a bridge, CLI, native host, local port, terminal, or companion application.
 
 ```text
-YouTube page
+YouTube
   -> Professor Ask extension
-      -> Chrome Native Messaging
-          -> Professor Ask Companion (started automatically by Chrome)
-              -> Codex provider -> codex app-server -> ChatGPT OAuth
-              -> Antigravity provider -> agy -> Google OAuth
+      -> OpenAI Codex device OAuth
+          -> auth.openai.com in a new Chrome tab
+          -> user authorizes the ChatGPT account
+      -> ChatGPT Codex backend
 ```
 
-There is no `127.0.0.1` port in the normal application path.
+The extension stores its Codex OAuth session in extension-private IndexedDB, refreshes the access token when needed, retrieves the account-scoped model catalog, and sends Professor Ask requests directly to the Codex Responses backend.
 
-## One-time Windows setup
-
-For the current development build:
-
-1. Pull the repository.
-2. Double-click **`Installer Professor Ask.vbs`** at the repository root.
-3. A confirmation dialog appears when the companion is installed.
-4. Reload Professor Ask in `chrome://extensions` or `edge://extensions`.
-
-No terminal needs to stay open after installation. Chrome starts the native companion automatically whenever the extension needs it.
-
-The development installer currently requires Node.js because the native launcher starts `native-host/host.js`. A packaged self-contained executable can replace that dependency for distribution later without changing the extension architecture.
-
-## Stable extension ID
-
-The extension manifest contains a fixed public key so its unpacked extension ID remains stable:
-
-```text
-geibmmecfgilkhncpcjjldbidnejflfb
-```
-
-The Windows Native Messaging host is registered only for that extension origin.
-
-## Providers
-
-### Codex / ChatGPT
-
-Codex uses the user's ChatGPT/Codex account through the official Codex app-server OAuth flow.
-
-Professor Ask asks `codex app-server` to start `account/login/start` with `type: chatgpt`. Codex owns the callback, tokens, refresh flow, and persisted account session. Professor Ask never receives the OAuth token.
-
-The model selector is populated dynamically with `model/list`, including the reasoning-effort levels supported by each available model.
+The model selector is populated from the connected account. Reasoning effort is exposed when the model catalog reports supported effort levels.
 
 ### Google Antigravity
 
-Antigravity uses the official `agy` CLI and the user's Google/Antigravity session.
+Antigravity is intentionally kept separate. Google currently documents account-based Antigravity authentication through the `agy` client, whose credentials live in the operating-system keyring. Google also documents OAuth for the Gemini API, but that flow belongs to a Google Cloud/OAuth project and does not represent the user's Antigravity account quota.
 
-If no Antigravity credentials exist, Professor Ask launches the official client invisibly; Antigravity opens the default browser for Google OAuth and stores the resulting session in Windows Credential Manager. No terminal window is required by Professor Ask.
-
-The model selector is populated dynamically with `agy models`. Questions use Antigravity headless mode and can resume a conversation per YouTube video.
+The existing local Antigravity connector remains optional while a supported browser-only Antigravity integration is investigated. It is not required for Codex.
 
 ## Settings
 
-The options page exposes:
+The options page exposes provider selection, OAuth status, model selection, Codex reasoning effort, answer language/detail, web-search policy, pause-on-question, transcript context window, transcript language, optional video metadata, panel appearance, and local history controls.
 
-- provider selection: Codex / Antigravity;
-- OAuth connection status, login and logout;
-- dynamic Codex model selection;
-- dynamic Codex reasoning-effort selection;
-- dynamic Antigravity model selection;
-- answer language;
-- answer detail level;
-- web-search policy;
-- pause-video-on-question behavior;
-- transcript context window;
-- preferred transcript language;
-- optional video title/channel metadata;
-- panel theme and height;
-- local conversation-history controls.
-
-Non-secret settings are saved with `chrome.storage.sync`. Conversation history is stored with `chrome.storage.local`.
+Non-secret settings use `chrome.storage.sync`. Conversation history uses `chrome.storage.local`. Codex OAuth credentials use IndexedDB owned by the extension service-worker origin.
 
 ## Development files
 
 ```text
 extension/
-  background.js      Native Messaging transport
-  content.js         YouTube panel + transcript context
-  options.*          settings UI
+  background.js       provider router
+  codex-direct.js     direct Codex OAuth + models + responses
+  content.js          YouTube panel + transcript context
+  options.*           settings UI
 
-native-host/
-  host.js            Native Messaging protocol + provider router
-  launcher.cs        tiny Windows stdio launcher
-  install.ps1        registration/compiler logic
-  Installer Professor Ask.vbs
-
-bridge/
-  providers/         Codex and Antigravity provider implementations
-  lib/               shared prompt/process helpers
-  server.js          legacy HTTP development bridge; not used by extension v0.5+
+native-host/          optional Antigravity connector only
+bridge/               legacy/local provider code, not required by Codex
 ```
 
 ## Security
 
-- No local HTTP port is required by the extension.
-- Native Messaging restricts the companion to the fixed Professor Ask extension origin.
-- ChatGPT credentials remain owned by Codex.
-- Google/Antigravity credentials remain owned by Antigravity/Windows Credential Manager.
-- The extension never reads provider OAuth tokens.
-- Transcript/chat content is sent only to the selected provider when the user asks a question.
+- Codex does not use ChatGPT cookies.
+- Passwords are entered only on OpenAI's authorization page.
+- OAuth tokens are not exposed to the YouTube page.
+- No localhost HTTP server is used for Codex.
+- Transcript/chat content is sent only when the user submits a question.
 
-## TipTour reference
+## TipTour / Hermes references
 
-The provider separation follows the same useful design principle seen in TipTour: UI and application logic do not need to know provider-specific credential details. Each provider exposes status, authentication, model listing, and execution behind a small interface.
+Professor Ask keeps provider-specific auth and execution behind separate provider layers. The direct Codex flow follows the same device-auth approach used by Hermes Agent: the app obtains a device authorization, opens the provider authorization page, polls for approval, exchanges the resulting authorization code, and keeps its own provider session.
