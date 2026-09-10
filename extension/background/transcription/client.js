@@ -10,6 +10,19 @@ function validateVideoId(value) {
   return videoId;
 }
 
+function connectionError(error) {
+  if (error?.name === 'AbortError') {
+    return new Error(`Le service de transcription ne répond pas (${TRANSCRIPTION_API_BASE}).`);
+  }
+  if (error instanceof TypeError || /failed to fetch/i.test(String(error?.message || ''))) {
+    return new Error(
+      `Service de transcription inaccessible (${TRANSCRIPTION_API_BASE}). `
+      + 'Codex est indépendant de ce service : les questions vidéo restent bloquées tant que la transcription n’est pas disponible.',
+    );
+  }
+  return error;
+}
+
 async function fetchJson(path, init = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRANSCRIPTION_REQUEST_TIMEOUT_MS);
@@ -40,8 +53,7 @@ async function fetchJson(path, init = {}) {
     }
     return data;
   } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('Le service de transcription ne répond pas.');
-    throw error;
+    throw connectionError(error);
   } finally {
     clearTimeout(timer);
   }
@@ -51,6 +63,8 @@ export async function routeTranscriptRequest(message) {
   const action = message?.action;
   const videoId = validateVideoId(message?.videoId);
   const language = normalizeLanguage(message?.language);
+
+  if (action === 'health') return fetchJson('/health');
 
   if (action === 'start') {
     return fetchJson('/v1/transcripts/youtube', {
