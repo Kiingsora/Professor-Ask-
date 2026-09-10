@@ -44,6 +44,8 @@
 .pa-settings:hover { background: var(--pa-surface-2); }
 .pa-toolbar { padding: 9px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--pa-line); }
 .pa-pill { background: var(--pa-surface-2); border: 1px solid var(--pa-line-strong); color: var(--pa-text); border-radius: 999px; padding: 5px 9px; font-size: 12px; }
+.pa-transcript-pill { cursor: pointer; }
+.pa-transcript-pill:hover, .pa-transcript-pill:focus { border-color: #777; outline: none; }
 .pa-messages { flex: 1; min-height: 230px; max-height: 440px; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .pa-size-compact .pa-messages { min-height: 180px; max-height: 300px; }
 .pa-size-standard .pa-messages { min-height: 230px; max-height: 440px; }
