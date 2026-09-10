@@ -33,6 +33,7 @@
         "content/transcript/remote.js",
         "content/transcript/status.js",
         "content/transcript/manager.js",
+        "content/transcript/preview.js",
         "content/ui.js",
         "content/chat.js",
         "content/app.js"
