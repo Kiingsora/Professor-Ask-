@@ -55,7 +55,7 @@ async function routeRequest(message) {
   try {
     if (pathname === '/health') {
       return okResponse({
-        version: '0.6.1',
+        version: '0.6.2',
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
