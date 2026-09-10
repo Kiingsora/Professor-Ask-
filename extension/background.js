@@ -27,12 +27,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'BRIDGE_FETCH') {
     routeRequest(message)
       .then(sendResponse)
-      .catch(error => sendResponse({
-        ok: false,
-        status: 0,
-        data: null,
-        error: error?.message || String(error),
-      }));
+      .catch(error => sendResponse({ ok: false, status: 0, data: null, error: error?.message || String(error) }));
     return true;
   }
 });
@@ -60,7 +55,7 @@ async function routeRequest(message) {
   try {
     if (pathname === '/health') {
       return okResponse({
-        version: '0.6.0',
+        version: '0.6.1',
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
@@ -69,59 +64,33 @@ async function routeRequest(message) {
       }, 'browser');
     }
 
-    if (pathname === '/account') {
-      return okResponse(await directCodex('status', message), 'direct-codex-oauth');
-    }
-
-    if (pathname === '/login') {
-      return okResponse(await directCodex('login', message), 'direct-codex-oauth');
-    }
+    if (pathname === '/account') return okResponse(await directCodex('status', message), 'direct-codex-oauth');
+    if (pathname === '/login') return okResponse(await directCodex('login', message), 'direct-codex-oauth');
 
     const providerRoute = pathname.match(/^\/providers\/(codex|antigravity)\/(status|models|login|logout)$/);
     if (providerRoute) {
       const [, provider, operation] = providerRoute;
-      if (provider === 'codex') {
-        return okResponse(await directCodex(operation, message), 'direct-codex-oauth');
-      }
-      return okResponse(await nativeRequest({
-        action: `provider.${operation}`,
-        provider: 'antigravity',
-      }, operation === 'login' ? 60000 : (operation === 'models' ? 45000 : 30000)), 'chrome-native-messaging');
+      if (provider === 'codex') return okResponse(await directCodex(operation, message), 'direct-codex-oauth');
+      return okResponse(await nativeRequest({ action: `provider.${operation}`, provider: 'antigravity' }, operation === 'login' ? 60000 : (operation === 'models' ? 45000 : 30000)), 'chrome-native-messaging');
     }
 
     if (pathname === '/chat') {
       const provider = message.body?.provider || 'codex';
-      if (provider === 'codex') {
-        return okResponse(await directCodex('chat', message), 'direct-codex-oauth');
-      }
+      if (provider === 'codex') return okResponse(await directCodex('chat', message), 'direct-codex-oauth');
       if (provider === 'antigravity') {
-        return okResponse(await nativeRequest({
-          action: 'chat',
-          payload: message.body || {},
-        }, 210000), 'chrome-native-messaging');
+        return okResponse(await nativeRequest({ action: 'chat', payload: message.body || {} }, 210000), 'chrome-native-messaging');
       }
       throw new Error(`Fournisseur inconnu: ${provider}`);
     }
 
     throw new Error('Route Professor Ask non autorisée.');
   } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      data: null,
-      error: error?.message || String(error),
-    };
+    return { ok: false, status: 0, data: null, error: error?.message || String(error) };
   }
 }
 
 function okResponse(data, transport) {
-  return {
-    ok: true,
-    status: 200,
-    data,
-    transport,
-    error: null,
-  };
+  return { ok: true, status: 200, data, transport, error: null };
 }
 
 function friendlyNativeError(message) {
@@ -129,12 +98,8 @@ function friendlyNativeError(message) {
   if (/native messaging host.*not found|specified native messaging host not found/i.test(text)) {
     return 'Antigravity nécessite encore son client local dans cette version. La connexion ChatGPT/Codex, elle, fonctionne directement dans le navigateur.';
   }
-  if (/access.*native messaging|not allowed to access native messaging/i.test(text)) {
-    return 'Chrome refuse l’accès au connecteur Antigravity local.';
-  }
-  if (/disconnected|native host has exited|communication with the native messaging host/i.test(text)) {
-    return 'Le connecteur Antigravity local s’est arrêté.';
-  }
+  if (/access.*native messaging|not allowed to access native messaging/i.test(text)) return 'Chrome refuse l’accès au connecteur Antigravity local.';
+  if (/disconnected|native host has exited|communication with the native messaging host/i.test(text)) return 'Le connecteur Antigravity local s’est arrêté.';
   return text || 'Connecteur Antigravity indisponible.';
 }
 
