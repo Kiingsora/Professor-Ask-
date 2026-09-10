@@ -1,5 +1,6 @@
-const NATIVE_HOST = 'com.professorask.bridge';
+importScripts('codex-direct.js');
 
+const NATIVE_HOST = 'com.professorask.bridge';
 let nativePort = null;
 let nextNativeId = 1;
 const nativePending = new Map();
@@ -23,33 +24,118 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  // Compatibility layer: content.js and options.js keep using BRIDGE_FETCH,
-  // while the transport is Chrome Native Messaging rather than localhost HTTP.
   if (message?.type === 'BRIDGE_FETCH') {
-    proxyNativeRequest(message)
+    routeRequest(message)
       .then(sendResponse)
       .catch(error => sendResponse({
         ok: false,
         status: 0,
         data: null,
-        error: friendlyNativeError(error?.message || String(error)),
+        error: error?.message || String(error),
       }));
     return true;
   }
 });
 
+function parsePath(rawPath) {
+  try {
+    return new URL(typeof rawPath === 'string' ? rawPath : '', 'https://professor-ask.invalid').pathname;
+  } catch {
+    throw new Error('Route Professor Ask invalide.');
+  }
+}
+
+async function directCodex(operation, message) {
+  if (operation === 'status') return ProfessorAskCodex.status();
+  if (operation === 'login') return ProfessorAskCodex.login();
+  if (operation === 'logout') return ProfessorAskCodex.logout();
+  if (operation === 'models') return ProfessorAskCodex.models();
+  if (operation === 'chat') return ProfessorAskCodex.chat(message.body || {});
+  throw new Error(`Action Codex inconnue: ${operation}`);
+}
+
+async function routeRequest(message) {
+  const pathname = parsePath(message.path);
+
+  try {
+    if (pathname === '/health') {
+      return okResponse({
+        version: '0.6.0',
+        transport: 'browser',
+        providers: {
+          codex: 'direct-oauth',
+          antigravity: 'native-companion-optional',
+        },
+      }, 'browser');
+    }
+
+    if (pathname === '/account') {
+      return okResponse(await directCodex('status', message), 'direct-codex-oauth');
+    }
+
+    if (pathname === '/login') {
+      return okResponse(await directCodex('login', message), 'direct-codex-oauth');
+    }
+
+    const providerRoute = pathname.match(/^\/providers\/(codex|antigravity)\/(status|models|login|logout)$/);
+    if (providerRoute) {
+      const [, provider, operation] = providerRoute;
+      if (provider === 'codex') {
+        return okResponse(await directCodex(operation, message), 'direct-codex-oauth');
+      }
+      return okResponse(await nativeRequest({
+        action: `provider.${operation}`,
+        provider: 'antigravity',
+      }, operation === 'login' ? 60000 : (operation === 'models' ? 45000 : 30000)), 'chrome-native-messaging');
+    }
+
+    if (pathname === '/chat') {
+      const provider = message.body?.provider || 'codex';
+      if (provider === 'codex') {
+        return okResponse(await directCodex('chat', message), 'direct-codex-oauth');
+      }
+      if (provider === 'antigravity') {
+        return okResponse(await nativeRequest({
+          action: 'chat',
+          payload: message.body || {},
+        }, 210000), 'chrome-native-messaging');
+      }
+      throw new Error(`Fournisseur inconnu: ${provider}`);
+    }
+
+    throw new Error('Route Professor Ask non autorisée.');
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error: error?.message || String(error),
+    };
+  }
+}
+
+function okResponse(data, transport) {
+  return {
+    ok: true,
+    status: 200,
+    data,
+    transport,
+    error: null,
+  };
+}
+
 function friendlyNativeError(message) {
   const text = String(message || '');
   if (/native messaging host.*not found|specified native messaging host not found/i.test(text)) {
-    return 'Le composant Professor Ask n’est pas encore installé. Lance une seule fois “Installer Professor Ask.vbs”, puis actualise l’extension.';
+    return 'Antigravity nécessite encore son client local dans cette version. La connexion ChatGPT/Codex, elle, fonctionne directement dans le navigateur.';
   }
   if (/access.*native messaging|not allowed to access native messaging/i.test(text)) {
-    return 'Chrome refuse l’accès au composant Professor Ask. Relance “Installer Professor Ask.vbs”, puis actualise l’extension.';
+    return 'Chrome refuse l’accès au connecteur Antigravity local.';
   }
   if (/disconnected|native host has exited|communication with the native messaging host/i.test(text)) {
-    return 'Le composant Professor Ask s’est arrêté de façon inattendue.';
+    return 'Le connecteur Antigravity local s’est arrêté.';
   }
-  return text || 'Le composant Professor Ask est indisponible.';
+  return text || 'Connecteur Antigravity indisponible.';
 }
 
 function failNativePending(error) {
@@ -63,7 +149,6 @@ function failNativePending(error) {
 
 function ensureNativePort() {
   if (nativePort) return nativePort;
-
   const port = chrome.runtime.connectNative(NATIVE_HOST);
   nativePort = port;
 
@@ -71,12 +156,10 @@ function ensureNativePort() {
     const id = String(message?.id ?? '');
     const pending = nativePending.get(id);
     if (!pending) return;
-
     nativePending.delete(id);
     clearTimeout(pending.timer);
-
     if (message?.ok) pending.resolve(message.data);
-    else pending.reject(new Error(message?.error || 'Erreur du composant Professor Ask.'));
+    else pending.reject(new Error(message?.error || 'Erreur Antigravity.'));
   });
 
   port.onDisconnect.addListener(() => {
@@ -94,11 +177,9 @@ function nativeRequest(payload, timeoutMs = 30000) {
     const port = ensureNativePort();
     const timer = setTimeout(() => {
       nativePending.delete(id);
-      reject(new Error(`Timeout du composant Professor Ask sur ${payload.action || 'requête'}.`));
+      reject(new Error('Timeout du connecteur Antigravity.'));
     }, timeoutMs);
-
     nativePending.set(id, { resolve, reject, timer });
-
     try {
       port.postMessage({ id, ...payload });
     } catch (error) {
@@ -107,62 +188,4 @@ function nativeRequest(payload, timeoutMs = 30000) {
       reject(error);
     }
   });
-}
-
-function requestFromLegacyPath(message) {
-  const rawPath = typeof message.path === 'string' ? message.path : '';
-  let pathname;
-  try {
-    pathname = new URL(rawPath, 'https://professor-ask.invalid').pathname;
-  } catch {
-    throw new Error('Route Professor Ask invalide.');
-  }
-
-  if (pathname === '/health') return { action: 'health', timeoutMs: 10000 };
-  if (pathname === '/account') return { action: 'provider.status', provider: 'codex', timeoutMs: 30000 };
-  if (pathname === '/login') return { action: 'provider.login', provider: 'codex', timeoutMs: 60000 };
-
-  const providerRoute = pathname.match(/^\/providers\/(codex|antigravity)\/(status|models|login|logout)$/);
-  if (providerRoute) {
-    const [, provider, operation] = providerRoute;
-    const timeoutMs = operation === 'login' ? 60000 : (operation === 'models' ? 45000 : 30000);
-    return {
-      action: `provider.${operation}`,
-      provider,
-      timeoutMs,
-    };
-  }
-
-  if (pathname === '/chat') {
-    return {
-      action: 'chat',
-      payload: message.body || {},
-      timeoutMs: 210000,
-    };
-  }
-
-  throw new Error('Route Professor Ask non autorisée.');
-}
-
-async function proxyNativeRequest(message) {
-  try {
-    const mapped = requestFromLegacyPath(message);
-    const { timeoutMs, ...payload } = mapped;
-    const data = await nativeRequest(payload, timeoutMs);
-    return {
-      ok: true,
-      status: 200,
-      data,
-      transport: 'chrome-native-messaging',
-      error: null,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      data: null,
-      transport: 'chrome-native-messaging',
-      error: friendlyNativeError(error?.message || String(error)),
-    };
-  }
 }
