@@ -24,6 +24,7 @@
     transcriptStatus: 'idle',
     transcriptProgress: null,
     transcriptError: null,
+    transcriptDiagnostics: null,
     connected: false,
     providerStatus: null,
     busy: false,
