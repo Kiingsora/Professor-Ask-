@@ -2,60 +2,75 @@
 
 Professor Ask is a Chrome/Edge extension that adds an AI discussion panel next to a YouTube video.
 
-The assistant receives the current timestamp, timestamped transcript context around that moment, optional video metadata, and the user's question.
+## Architecture
 
-## Provider architecture
-
-### Codex / ChatGPT — browser only
-
-Codex no longer needs a bridge, CLI, native host, local port, terminal, or companion application.
-
-```text
-YouTube
-  -> Professor Ask extension
-      -> OpenAI Codex device OAuth
-          -> auth.openai.com in a new Chrome tab
-          -> user authorizes the ChatGPT account
-      -> ChatGPT Codex backend
-```
-
-The extension stores its Codex OAuth session in extension-private IndexedDB, refreshes the access token when needed, retrieves the account-scoped model catalog, and sends Professor Ask requests directly to the Codex Responses backend.
-
-The model selector is populated from the connected account. Reasoning effort is exposed when the model catalog reports supported effort levels.
-
-### Google Antigravity
-
-Antigravity is intentionally kept separate. Google currently documents account-based Antigravity authentication through the `agy` client, whose credentials live in the operating-system keyring. Google also documents OAuth for the Gemini API, but that flow belongs to a Google Cloud/OAuth project and does not represent the user's Antigravity account quota.
-
-The existing local Antigravity connector remains optional while a supported browser-only Antigravity integration is investigated. It is not required for Codex.
-
-## Settings
-
-The options page exposes provider selection, OAuth status, model selection, Codex reasoning effort, answer language/detail, web-search policy, pause-on-question, transcript context window, transcript language, optional video metadata, panel appearance, and local history controls.
-
-Non-secret settings use `chrome.storage.sync`. Conversation history uses `chrome.storage.local`. Codex OAuth credentials use IndexedDB owned by the extension service-worker origin.
-
-## Development files
+The project is split by runtime and responsibility. Browser code never imports Node code, and provider-specific code stays behind a provider boundary.
 
 ```text
 extension/
-  background.js       provider router
-  codex-direct.js     direct Codex OAuth + models + responses
-  content.js          YouTube panel + transcript context
-  options.*           settings UI
+├─ background/
+│  ├─ index.js                 # Chrome events only
+│  ├─ router.js                # message routing only
+│  └─ native-messaging.js      # optional Antigravity transport only
+├─ providers/
+│  └─ codex/
+│     ├─ auth.js               # device OAuth + token refresh
+│     ├─ client.js             # authenticated HTTP
+│     ├─ config.js             # endpoints and constants
+│     ├─ identity.js           # JWT/account parsing
+│     ├─ index.js              # provider facade
+│     ├─ models.js             # account model catalog
+│     ├─ chat.js               # Codex Responses request
+│     ├─ prompt.js             # Professor Ask prompt
+│     ├─ response.js           # HTTP response helpers
+│     ├─ storage.js            # private IndexedDB secrets
+│     └─ stream.js             # SSE parsing
+├─ content/
+│  ├─ core.js                  # shared state + small utilities
+│  ├─ app.js                   # YouTube lifecycle
+│  ├─ ui.js                    # panel rendering
+│  ├─ chat.js                  # question submission
+│  ├─ history.js               # local conversation history
+│  ├─ style.css
+│  └─ transcript/
+│     ├─ youtube.js            # YouTube caption source
+│     └─ manager.js            # transcript orchestration/context
+├─ options/
+│  ├─ index.html
+│  ├─ index.js                 # page bootstrap only
+│  ├─ core.js                  # shared options state/utilities
+│  ├─ form.js                  # form rendering
+│  ├─ providers.js             # provider actions
+│  ├─ storage.js               # settings/history persistence
+│  └─ style.css
+└─ manifest.json
 
-native-host/          optional Antigravity connector only
-bridge/               legacy/local provider code, not required by Codex
+native-host/
+├─ host.js                     # Native Messaging protocol only
+├─ providers/antigravity.js    # optional Antigravity provider
+└─ lib/                        # Node-only helpers
 ```
 
-## Security
+## Providers
 
-- Codex does not use ChatGPT cookies.
-- Passwords are entered only on OpenAI's authorization page.
-- OAuth tokens are not exposed to the YouTube page.
-- No localhost HTTP server is used for Codex.
-- Transcript/chat content is sent only when the user submits a question.
+### Codex / ChatGPT
 
-## TipTour / Hermes references
+Codex is browser-only. The extension performs the OpenAI device OAuth flow, stores the session in extension-private IndexedDB, refreshes tokens, retrieves the account-scoped model catalog and sends requests directly to the Codex backend. No localhost bridge, CLI, terminal or companion is required.
 
-Professor Ask keeps provider-specific auth and execution behind separate provider layers. The direct Codex flow follows the same device-auth approach used by Hermes Agent: the app obtains a device authorization, opens the provider authorization page, polls for approval, exchanges the resulting authorization code, and keeps its own provider session.
+### Google Antigravity
+
+Antigravity remains optional and isolated behind Native Messaging because the account quota is currently exposed through the local `agy` client. The native host contains no Codex code.
+
+## Transcription
+
+`content/transcript/manager.js` is the single orchestration point. Today it asks `youtube.js` for native YouTube captions. A future browser transcription fallback can be added as another source without touching the UI, chat or provider code.
+
+## Storage
+
+- `chrome.storage.sync`: non-secret preferences.
+- `chrome.storage.local`: per-video conversation history.
+- extension-private IndexedDB: Codex OAuth credentials.
+
+## Development rule
+
+A file should have one clear responsibility. New provider logic belongs under `extension/providers/<provider>/`; new transcript sources belong under `extension/content/transcript/`; Chrome event wiring belongs under `extension/background/`.

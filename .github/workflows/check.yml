@@ -14,7 +14,7 @@ jobs:
           node-version: '20'
       - name: Check JavaScript syntax
         run: |
-          find bridge extension native-host -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+          find extension native-host -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
       - name: Validate extension manifest
         run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
       - name: Smoke test Native Messaging protocol
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Compile and register Native Messaging companion
+      - name: Compile and register optional Antigravity companion
         shell: powershell
         run: |
           & .\native-host\install.ps1
@@ -45,7 +45,7 @@ jobs:
           if ($manifest.allowed_origins[0] -ne 'chrome-extension://geibmmecfgilkhncpcjjldbidnejflfb/') { throw 'Unexpected extension origin' }
           if (-not (Test-Path $manifest.path)) { throw "Native host executable missing: $($manifest.path)" }
 
-          $installRoot = Join-Path $env:LOCALAPPDATA 'ProfessorAsk\NativeHost\0.5.1'
+          $installRoot = Join-Path $env:LOCALAPPDATA 'ProfessorAsk\NativeHost\0.7.0'
           if (-not ($manifest.path.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase))) {
             throw "Native host was not installed under LocalAppData: $($manifest.path)"
           }

@@ -20,6 +20,7 @@ const timeout = setTimeout(() => {
 child.stdout.on('data', chunk => {
   buffer = Buffer.concat([buffer, chunk]);
   if (buffer.length < 4) return;
+
   const length = buffer.readUInt32LE(0);
   if (buffer.length < 4 + length) return;
 
@@ -30,8 +31,8 @@ child.stdout.on('data', chunk => {
   if (!response.ok) throw new Error(response.error || 'Native host returned an error.');
   if (response.id !== 'test-1') throw new Error('Unexpected Native Messaging response id.');
   if (response.data?.transport !== 'chrome-native-messaging') throw new Error('Unexpected transport.');
-  if (!Array.isArray(response.data?.providers) || !response.data.providers.includes('codex')) {
-    throw new Error('Provider catalog missing from health response.');
+  if (!Array.isArray(response.data?.providers) || response.data.providers.length !== 1 || response.data.providers[0] !== 'antigravity') {
+    throw new Error('Native host must expose only Antigravity.');
   }
 
   console.log(`Native Messaging health OK (v${response.data.version}).`);

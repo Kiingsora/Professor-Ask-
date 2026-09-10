@@ -4,14 +4,12 @@ export function formatTime(value) {
   sec %= 3600;
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return h
-    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    : `${m}:${String(s).padStart(2, '0')}`;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 export function buildProfessorPrompt(payload) {
   const transcript = (payload.transcript || [])
-    .map(seg => `[${formatTime(seg.start)}] ${String(seg.text || '').trim()}`)
+    .map(segment => `[${formatTime(segment.start)}] ${String(segment.text || '').trim()}`)
     .filter(Boolean)
     .join('\n');
 

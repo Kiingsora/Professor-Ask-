@@ -9,7 +9,7 @@ ps1 = fso.BuildPath(baseDir, "install.ps1")
 statusFile = fso.BuildPath(baseDir, "install-status.txt")
 
 If Not fso.FileExists(ps1) Then
-  MsgBox "install.ps1 est introuvable.", vbCritical, "Professor Ask"
+  MsgBox "install.ps1 est introuvable.", vbCritical, "Professor Ask — Antigravity"
   WScript.Quit 1
 End If
 
@@ -26,9 +26,9 @@ Else
 End If
 
 If Left(statusText, 2) = "OK" Then
-  MsgBox Mid(statusText, 5), vbInformation, "Professor Ask Companion"
+  MsgBox Mid(statusText, 5), vbInformation, "Professor Ask — Antigravity"
 Else
-  MsgBox Replace(statusText, "ERROR" & vbCrLf, ""), vbCritical, "Professor Ask Companion"
+  MsgBox Replace(statusText, "ERROR" & vbCrLf, ""), vbCritical, "Professor Ask — Antigravity"
 End If
 
 WScript.Quit exitCode

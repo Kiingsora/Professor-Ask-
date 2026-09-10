@@ -1,15 +1,12 @@
 import { spawn } from 'node:child_process';
 import { buildProfessorPrompt } from '../lib/prompt.js';
-import { commandExists, runCommand, stripAnsi } from '../lib/process-utils.js';
+import { commandExists, runCommand, stripAnsi } from '../lib/process.js';
 
 export class AntigravityProvider {
   constructor() {
     this.conversations = new Map();
     this.loginProcess = null;
   }
-
-  get id() { return 'antigravity'; }
-  get label() { return 'Antigravity'; }
 
   async installed() {
     return commandExists('agy', ['--version']);
@@ -39,22 +36,15 @@ export class AntigravityProvider {
 
       let model = null;
       try {
-        const parsed = JSON.parse(stdout);
-        model = parsed?.response?.trim() || null;
+        model = JSON.parse(stdout)?.response?.trim() || null;
       } catch {
         model = stdout.trim() || null;
       }
 
-      // The hidden interactive process is only needed to trigger the first OAuth.
-      // Once credentials exist in Windows Credential Manager, headless calls work.
       this.stopLoginProcess();
       return { installed: true, connected: true, model };
     } catch (error) {
-      return {
-        installed: true,
-        connected: false,
-        error: error.message,
-      };
+      return { installed: true, connected: false, error: error.message };
     }
   }
 
@@ -67,11 +57,7 @@ export class AntigravityProvider {
     if (current.connected) return { ...current, alreadyConnected: true };
 
     if (this.loginProcess && !this.loginProcess.killed) {
-      return {
-        started: true,
-        opened: true,
-        message: 'La connexion Google Antigravity est déjà en cours dans le navigateur.',
-      };
+      return { started: true, opened: true, message: 'La connexion Google Antigravity est déjà en cours dans le navigateur.' };
     }
 
     const child = spawn('agy', [], {
@@ -99,11 +85,7 @@ export class AntigravityProvider {
       if (this.loginProcess === child) this.loginProcess = null;
     });
 
-    return {
-      started: true,
-      opened: true,
-      message: 'Antigravity a lancé le Google OAuth dans ton navigateur. Aucun terminal n’est nécessaire.',
-    };
+    return { started: true, opened: true, message: 'Antigravity a lancé le Google OAuth dans ton navigateur.' };
   }
 
   async logout() {
@@ -115,15 +97,12 @@ export class AntigravityProvider {
   }
 
   async models() {
-    if (!(await this.installed())) {
-      throw new Error('Antigravity CLI (agy) n’est pas installé.');
-    }
+    if (!(await this.installed())) throw new Error('Antigravity CLI (agy) n’est pas installé.');
 
     const { stdout } = await runCommand('agy', ['models'], { timeoutMs: 25000 });
-    const cleaned = stripAnsi(stdout);
     const models = [];
 
-    for (const rawLine of cleaned.split(/\r?\n/)) {
+    for (const rawLine of stripAnsi(stdout).split(/\r?\n/)) {
       const line = rawLine.trim();
       if (!line) continue;
 
@@ -136,10 +115,7 @@ export class AntigravityProvider {
       models.push({ id, label: label || id });
     }
 
-    if (!models.length) {
-      throw new Error('Antigravity est accessible mais aucun modèle n’a pu être lu depuis `agy models`.');
-    }
-
+    if (!models.length) throw new Error('Antigravity est accessible mais aucun modèle n’a pu être lu depuis `agy models`.');
     return { models };
   }
 
@@ -150,12 +126,7 @@ export class AntigravityProvider {
     const model = payload.settings?.antigravityModel;
     const conversationKey = `${payload.videoId || 'unknown'}:${model || 'auto'}`;
     const previousConversation = this.conversations.get(conversationKey);
-
-    const args = [
-      '-p', prompt,
-      '--output-format', 'json',
-      '--print-timeout', '3m',
-    ];
+    const args = ['-p', prompt, '--output-format', 'json', '--print-timeout', '3m'];
 
     if (model && model !== 'auto') args.push('--model', model);
     if (previousConversation) args.push('--conversation', previousConversation);
@@ -183,10 +154,7 @@ export class AntigravityProvider {
 
     const answer = String(result?.response || '').trim();
     if (!answer) throw new Error('Antigravity a renvoyé une réponse vide.');
-
-    if (result?.conversation_id) {
-      this.conversations.set(conversationKey, result.conversation_id);
-    }
+    if (result?.conversation_id) this.conversations.set(conversationKey, result.conversation_id);
 
     return {
       answer,
