@@ -23,6 +23,17 @@ class TranscriptSegment(BaseModel):
     text: str
 
 
+class TranscriptDiagnostics(BaseModel):
+    segment_count: int
+    first_timestamp: float
+    last_timestamp: float
+    covered_seconds: float
+    audio_duration: float
+    coverage_ratio: float
+    detected_language: str | None = None
+    model: str
+
+
 class TranscriptJobResponse(BaseModel):
     video_id: str
     language: str
@@ -30,4 +41,5 @@ class TranscriptJobResponse(BaseModel):
     progress: float = 0
     source: str = 'generated'
     segments: list[TranscriptSegment] = Field(default_factory=list)
+    diagnostics: TranscriptDiagnostics | None = None
     error: str | None = None
