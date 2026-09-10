@@ -9,6 +9,7 @@ class JobState:
     status: str = 'queued'
     progress: float = 0.0
     segments: list[dict] = field(default_factory=list)
+    diagnostics: dict | None = None
     error: str | None = None
 
     def snapshot(self) -> dict:
@@ -19,6 +20,7 @@ class JobState:
             'progress': round(float(self.progress), 1),
             'source': 'generated',
             'segments': list(self.segments),
+            'diagnostics': dict(self.diagnostics) if self.diagnostics else None,
             'error': self.error,
         }
 
@@ -50,12 +52,13 @@ class JobRegistry:
             if progress is not None:
                 job.progress = max(0.0, min(100.0, float(progress)))
 
-    def complete(self, video_id: str, language: str, segments: list[dict]) -> None:
+    def complete(self, video_id: str, language: str, segments: list[dict], diagnostics: dict) -> None:
         with self._lock:
             job = self._jobs[(video_id, language)]
             job.status = 'ready'
             job.progress = 100.0
             job.segments = segments
+            job.diagnostics = diagnostics
             job.error = None
 
     def fail(self, video_id: str, language: str, error: str) -> None:
