@@ -29,5 +29,5 @@ class TranscriptJobResponse(BaseModel):
     status: Literal['queued', 'downloading', 'transcribing', 'ready', 'failed']
     progress: float = 0
     source: str = 'generated'
-    segments: list[TranscriptSegment] = []
+    segments: list[TranscriptSegment] = Field(default_factory=list)
     error: str | None = None

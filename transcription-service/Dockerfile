@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-ARG DENO_VERSION=2.6.3
+ARG DENO_VERSION=2.8.2
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip libgomp1 \
@@ -18,6 +18,8 @@ ENV PROFESSOR_ASK_DATA_DIR=/data
 ENV PROFESSOR_ASK_WHISPER_MODEL=small
 ENV PROFESSOR_ASK_WHISPER_DEVICE=cpu
 ENV PROFESSOR_ASK_WHISPER_COMPUTE_TYPE=int8
+ENV PROFESSOR_ASK_MAX_CONCURRENT_JOBS=1
+ENV HF_HOME=/data/huggingface
 
 VOLUME ["/data"]
 EXPOSE 43120

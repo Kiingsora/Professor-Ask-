@@ -10,6 +10,7 @@ class Settings:
     device: str
     compute_type: str
     max_video_seconds: int
+    max_concurrent_jobs: int
 
 
 def load_settings() -> Settings:
@@ -21,6 +22,7 @@ def load_settings() -> Settings:
         device=os.getenv('PROFESSOR_ASK_WHISPER_DEVICE', 'cpu'),
         compute_type=os.getenv('PROFESSOR_ASK_WHISPER_COMPUTE_TYPE', 'int8'),
         max_video_seconds=int(os.getenv('PROFESSOR_ASK_MAX_VIDEO_SECONDS', '10800')),
+        max_concurrent_jobs=max(1, int(os.getenv('PROFESSOR_ASK_MAX_CONCURRENT_JOBS', '1'))),
     )
 
 

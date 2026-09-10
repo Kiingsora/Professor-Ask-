@@ -17,6 +17,7 @@ class TranscriptionService:
         self.downloader = YoutubeAudioDownloader(settings.max_video_seconds)
         self.transcriber = WhisperTranscriber(settings.model_name, settings.device, settings.compute_type)
         self._tasks: set[asyncio.Task] = set()
+        self._capacity = asyncio.Semaphore(settings.max_concurrent_jobs)
 
     async def start(self, video_id: str, language: str) -> dict:
         cached = self.cache.load(video_id, language)
@@ -39,7 +40,8 @@ class TranscriptionService:
 
     async def _run(self, video_id: str, language: str) -> None:
         try:
-            await asyncio.to_thread(self._process, video_id, language)
+            async with self._capacity:
+                await asyncio.to_thread(self._process, video_id, language)
         except Exception as error:
             self.jobs.fail(video_id, language, str(error))
 

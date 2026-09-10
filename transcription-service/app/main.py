@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .schemas import StartTranscriptRequest, TranscriptJobResponse
+from .schemas import StartTranscriptRequest, TranscriptJobResponse, VIDEO_ID_RE
 from .service import TranscriptionService
 
 app = FastAPI(title='Professor Ask Transcription Service', version='0.1.0')
@@ -23,6 +23,7 @@ async def health() -> dict:
         'model': settings.model_name,
         'device': settings.device,
         'compute_type': settings.compute_type,
+        'max_concurrent_jobs': settings.max_concurrent_jobs,
     }
 
 
@@ -33,7 +34,7 @@ async def start_transcript(request: StartTranscriptRequest) -> dict:
 
 @app.get('/v1/transcripts/youtube/{video_id}', response_model=TranscriptJobResponse)
 async def transcript_status(video_id: str, language: str = Query(default='auto', pattern='^(auto|fr|en)$')) -> dict:
-    if len(video_id) != 11:
+    if not VIDEO_ID_RE.fullmatch(video_id):
         raise HTTPException(status_code=400, detail='Invalid YouTube video id')
     result = await service.status(video_id, language)
     if result is None:
