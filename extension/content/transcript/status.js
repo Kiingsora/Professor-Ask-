@@ -16,11 +16,13 @@
     return parts.join(' · ');
   }
 
-  function rangeLabel(details) {
-    const first = Number(details?.first_timestamp);
-    const last = Number(details?.last_timestamp);
-    if (!Number.isFinite(first) || !Number.isFinite(last)) return '';
-    return `${PA.fmt(first)}–${PA.fmt(last)}`;
+  function updatePreviewButton(enabled) {
+    const button = PA.qs('#pa-transcript-preview');
+    if (!button) return;
+    button.disabled = !enabled;
+    button.title = enabled
+      ? 'Afficher les lignes de transcription autour du moment actuel.'
+      : 'La transcription doit être prête avant de pouvoir l’afficher.';
   }
 
   PA.setTranscriptStatus = function setTranscriptStatus(status, progress = null, error = null, diagnostics = null) {
@@ -30,25 +32,72 @@
     if (diagnostics) PA.state.transcriptDiagnostics = diagnostics;
 
     const badge = PA.qs('#pa-transcript');
+    const detail = PA.qs('#pa-transcript-detail');
+    const bar = PA.qs('#pa-transcript-bar');
     if (!badge) return;
 
     const details = diagnostics || PA.state.transcriptDiagnostics || null;
-    if (status === 'checking-youtube') badge.textContent = 'Recherche transcription…';
-    else if (status === 'youtube-ready') {
-      const kind = details?.source_kind === 'manual' ? 'Sous-titres YouTube manuels' : 'Sous-titres YouTube';
-      badge.textContent = details?.segment_count ? `${kind} · ${details.segment_count} segments` : kind;
-    } else if (status === 'queued') badge.textContent = 'Transcription IA en attente…';
-    else if (status === 'downloading') badge.textContent = `Préparation audio ${Math.round(PA.state.transcriptProgress || 0)} %`;
-    else if (status === 'transcribing') badge.textContent = `Transcription IA ${Math.round(PA.state.transcriptProgress || 0)} %`;
-    else if (status === 'generated-ready') {
-      const range = rangeLabel(details);
-      const count = details?.segment_count ? `${details.segment_count} segments` : '';
-      const suffix = [count, range].filter(Boolean).join(' · ');
-      badge.textContent = `Transcription IA prête${suffix ? ` · ${suffix}` : ''}`;
-    } else if (status === 'failed') badge.textContent = 'Transcription indisponible';
-    else badge.textContent = 'Transcription…';
+    bar?.classList.remove('is-ready', 'is-working', 'is-error');
 
-    const diagnosticText = error || describeDiagnostics(details);
-    badge.title = [diagnosticText, 'Cliquer pour vérifier le texte autour du moment actuel.'].filter(Boolean).join('\n');
+    if (status === 'checking-youtube') {
+      badge.textContent = 'Recherche des sous-titres YouTube…';
+      if (detail) detail.textContent = 'Professor Ask vérifie d’abord les sous-titres disponibles sur la vidéo.';
+      bar?.classList.add('is-working');
+      updatePreviewButton(false);
+      return;
+    }
+
+    if (status === 'youtube-ready') {
+      const kind = details?.source_kind === 'manual' ? 'manuels' : details?.source_kind === 'automatic' ? 'automatiques' : '';
+      badge.textContent = `Sous-titres YouTube${kind ? ` ${kind}` : ''} récupérés`;
+      if (detail) detail.textContent = describeDiagnostics(details) || 'La transcription horodatée YouTube est prête.';
+      bar?.classList.add('is-ready');
+      updatePreviewButton(true);
+      return;
+    }
+
+    if (status === 'queued') {
+      badge.textContent = 'Aucun sous-titre · Whisper va démarrer';
+      if (detail) detail.textContent = 'Le service de transcription prépare une transcription complète de la vidéo.';
+      bar?.classList.add('is-working');
+      updatePreviewButton(false);
+      return;
+    }
+
+    if (status === 'downloading') {
+      badge.textContent = `Whisper · préparation audio ${Math.round(PA.state.transcriptProgress || 0)} %`;
+      if (detail) detail.textContent = 'L’audio de la vidéo est en cours de préparation.';
+      bar?.classList.add('is-working');
+      updatePreviewButton(false);
+      return;
+    }
+
+    if (status === 'transcribing') {
+      badge.textContent = `Whisper · transcription ${Math.round(PA.state.transcriptProgress || 0)} %`;
+      if (detail) detail.textContent = 'Whisper produit les segments texte avec leurs timestamps.';
+      bar?.classList.add('is-working');
+      updatePreviewButton(false);
+      return;
+    }
+
+    if (status === 'generated-ready') {
+      badge.textContent = 'Whisper · transcription récupérée';
+      if (detail) detail.textContent = describeDiagnostics(details) || `${PA.state.transcript.length} segments horodatés disponibles.`;
+      bar?.classList.add('is-ready');
+      updatePreviewButton(true);
+      return;
+    }
+
+    if (status === 'failed') {
+      badge.textContent = 'Transcription indisponible';
+      if (detail) detail.textContent = error || 'Impossible de récupérer une transcription pour cette vidéo.';
+      bar?.classList.add('is-error');
+      updatePreviewButton(false);
+      return;
+    }
+
+    badge.textContent = 'Transcription…';
+    if (detail) detail.textContent = error || '';
+    updatePreviewButton(false);
   };
 })();
