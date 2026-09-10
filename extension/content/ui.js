@@ -87,7 +87,7 @@
         </header>
         <div class="pa-toolbar">
           <span class="pa-pill" id="pa-time">0:00</span>
-          <span class="pa-pill" id="pa-transcript">Transcription...</span>
+          <span class="pa-pill pa-transcript-pill" id="pa-transcript" role="button" tabindex="0" title="Cliquer pour vérifier la transcription autour du moment actuel">Transcription...</span>
           <span class="pa-pill" id="pa-provider">Codex</span>
           <span class="pa-status" id="pa-status"></span>
         </div>
@@ -107,6 +107,15 @@
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         PA.sendQuestion();
+      }
+    });
+
+    const transcriptBadge = PA.qs('#pa-transcript');
+    transcriptBadge?.addEventListener('click', () => PA.showTranscriptPreview?.());
+    transcriptBadge?.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        PA.showTranscriptPreview?.();
       }
     });
 
