@@ -70,7 +70,7 @@
     </section>
 
     <section class="settings-section">
-      <div class="section-heading"><div><h2>Contexte vidéo</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent. Sinon, il lance automatiquement une transcription complète via le service de transcription.</p></div></div>
+      <div class="section-heading"><div><h2>Contexte vidéo</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent. S’ils sont absents, le fallback de transcription doit s’exécuter directement dans l’extension, sans serveur Professor Ask ni programme local à installer.</p></div></div>
       <div class="settings-grid">
         <label class="field"><span>Fenêtre de contexte autour du timestamp</span><select id="context-seconds"><option value="60">± 1 minute</option><option value="180">± 3 minutes</option><option value="300">± 5 minutes</option><option value="600">± 10 minutes</option></select></label>
         <label class="field"><span>Langue de transcription préférée</span><select id="transcript-language"><option value="auto">Automatique</option><option value="fr">Français en priorité</option><option value="en">Anglais en priorité</option></select></label>
@@ -95,7 +95,7 @@
       <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
     </section>
 
-    <footer class="footer-note"><span>Codex : <code>OAuth direct dans Chrome</code></span><span>Professor Ask v0.8.0</span></footer>
+    <footer class="footer-note"><span>Codex : <code>OAuth direct dans Chrome</code></span><span>Professor Ask v0.9.0</span></footer>
   </main>
   <script type="module" src="index.js"></script>
 </body>
