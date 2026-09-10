@@ -59,7 +59,7 @@ class TranscriptionService:
             )
 
             self.jobs.update(video_id, language, status='transcribing', progress=25)
-            segments = self.transcriber.transcribe(
+            segments, diagnostics = self.transcriber.transcribe(
                 audio_path,
                 language,
                 lambda progress: self.jobs.update(video_id, language, status='transcribing', progress=progress),
@@ -72,7 +72,8 @@ class TranscriptionService:
             'progress': 100.0,
             'source': 'generated',
             'segments': segments,
+            'diagnostics': diagnostics,
             'error': None,
         }
         self.cache.save(video_id, language, payload)
-        self.jobs.complete(video_id, language, segments)
+        self.jobs.complete(video_id, language, segments, diagnostics)
