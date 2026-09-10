@@ -1,8 +1,7 @@
 importScripts('codex-direct.js');
 
-// Codex's hosted web-search wire format carries an explicit external_web_access
-// flag. Keep this small compatibility normalization at the transport boundary so
-// the provider module can expose the simple { type: 'web_search' } abstraction.
+// Keep Codex-specific wire compatibility at the transport boundary so the
+// provider module can stay simple and model-agnostic.
 const professorAskNativeFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = (input, init = {}) => {
   const url = typeof input === 'string' ? input : input?.url || '';
@@ -15,8 +14,16 @@ globalThis.fetch = (input, init = {}) => {
             ? { ...tool, external_web_access: true }
             : tool
         ));
-        init = { ...init, body: JSON.stringify(body) };
       }
+
+      // GPT-5.3-Codex-Spark is a lightweight research-preview model and has
+      // rejected reasoning-specific parameters in production. Let Spark use
+      // its server-side defaults instead of forwarding the generic Codex block.
+      if (body.model === 'gpt-5.3-codex-spark') {
+        delete body.reasoning;
+      }
+
+      init = { ...init, body: JSON.stringify(body) };
     } catch {
       // Let the original request surface its own validation error.
     }
@@ -79,7 +86,7 @@ async function routeRequest(message) {
   try {
     if (pathname === '/health') {
       return okResponse({
-        version: '0.6.3',
+        version: '0.6.4',
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
