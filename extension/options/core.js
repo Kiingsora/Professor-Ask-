@@ -24,9 +24,9 @@ export const store = {
 
 export const $ = id => document.getElementById(id);
 
-export function bridgeFetch(path, { method = 'GET', body } = {}) {
+export function providerRequest(path, { method = 'GET', body } = {}) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: 'BRIDGE_FETCH', path, method, body }, response => {
+    chrome.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body }, response => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
       if (!response) return reject(new Error('Aucune réponse du service worker Professor Ask.'));
       resolve(response);

@@ -1,7 +1,7 @@
 import { codexProvider } from '../providers/codex/index.js';
 import { nativeRequest } from './native-messaging.js';
 
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 
 function parsePath(rawPath) {
   try {

@@ -1,4 +1,3 @@
-bridge/.professor-ask-secrets.json
 node_modules/
 .DS_Store
 
@@ -7,3 +6,7 @@ native-host/com.professorask.bridge.json
 native-host/node-path.txt
 native-host/install-status.txt
 native-host/native-host.log
+
+transcription-service/data/
+transcription-service/__pycache__/
+transcription-service/app/__pycache__/

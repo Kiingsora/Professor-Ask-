@@ -4,7 +4,7 @@
   PA.fetchProviderStatus = async function fetchProviderStatus() {
     try {
       const provider = PA.state.settings.provider === 'antigravity' ? 'antigravity' : 'codex';
-      const response = await PA.bridgeFetch(`/providers/${provider}/status`);
+      const response = await PA.providerRequest(`/providers/${provider}/status`);
       const data = response.data || {};
       PA.state.connected = !!(response.ok && data.connected);
       PA.state.providerStatus = data;
@@ -47,7 +47,7 @@
         : '';
       const channel = includeMetadata ? (PA.qs('ytd-channel-name a')?.textContent?.trim() || '') : '';
 
-      const response = await PA.bridgeFetch('/chat', {
+      const response = await PA.providerRequest('/chat', {
         method: 'POST',
         body: {
           provider: PA.state.settings.provider,
@@ -57,6 +57,7 @@
           timestamp,
           question,
           transcript: PA.transcriptContextAt(timestamp),
+          transcriptSource: PA.state.transcriptSource,
           settings: {
             responseLanguage: PA.state.settings.responseLanguage,
             responseStyle: PA.state.settings.responseStyle,

@@ -1,0 +1,12 @@
+services:
+  transcription:
+    build: .
+    ports:
+      - "43120:43120"
+    volumes:
+      - ./data:/data
+    environment:
+      PROFESSOR_ASK_WHISPER_MODEL: small
+      PROFESSOR_ASK_WHISPER_DEVICE: cpu
+      PROFESSOR_ASK_WHISPER_COMPUTE_TYPE: int8
+      PROFESSOR_ASK_MAX_VIDEO_SECONDS: 10800

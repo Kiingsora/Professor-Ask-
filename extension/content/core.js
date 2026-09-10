@@ -21,6 +21,9 @@
     videoId: null,
     transcript: [],
     transcriptSource: null,
+    transcriptStatus: 'idle',
+    transcriptProgress: null,
+    transcriptError: null,
     connected: false,
     providerStatus: null,
     busy: false,
@@ -34,9 +37,9 @@
     qs(selector, root = document) {
       return root.querySelector(selector);
     },
-    bridgeFetch(path, { method = 'GET', body } = {}) {
+    providerRequest(path, { method = 'GET', body } = {}) {
       return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'BRIDGE_FETCH', path, method, body }, response => {
+        chrome.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body }, response => {
           if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
           if (!response) return reject(new Error('Aucune réponse du service worker Professor Ask.'));
           resolve(response);
@@ -44,11 +47,8 @@
       });
     },
     getVideoId() {
-      try {
-        return new URL(location.href).searchParams.get('v');
-      } catch {
-        return null;
-      }
+      try { return new URL(location.href).searchParams.get('v'); }
+      catch { return null; }
     },
     fmt(value) {
       let sec = Math.max(0, Math.floor(Number(value) || 0));

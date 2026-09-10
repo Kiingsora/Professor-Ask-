@@ -1,15 +1,15 @@
-import { $, bridgeFetch, openExternal, store } from './core.js';
+import { $, openExternal, providerRequest } from './core.js';
 import { populateModels, setProviderStatus } from './form.js';
 
 export async function loadModels(provider) {
-  const response = await bridgeFetch(`/providers/${provider}/models`);
+  const response = await providerRequest(`/providers/${provider}/models`);
   if (!response.ok) throw new Error(response.error || response.data?.error || 'Impossible de charger les modèles.');
   populateModels(provider, response.data?.models || []);
 }
 
 export async function refreshProvider(provider, { withModels = true } = {}) {
   setProviderStatus(provider, 'Vérification…', 'muted');
-  const response = await bridgeFetch(`/providers/${provider}/status`).catch(error => ({ ok: false, error: error.message }));
+  const response = await providerRequest(`/providers/${provider}/status`).catch(error => ({ ok: false, error: error.message }));
   const data = response?.data || {};
 
   if (!response?.ok) {
@@ -42,11 +42,8 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
   }
 
   if (withModels) {
-    try {
-      await loadModels(provider);
-    } catch (error) {
-      setProviderStatus(provider, `Connecté · modèles indisponibles : ${error.message}`, 'warn');
-    }
+    try { await loadModels(provider); }
+    catch (error) { setProviderStatus(provider, `Connecté · modèles indisponibles : ${error.message}`, 'warn'); }
   }
   return true;
 }
@@ -58,7 +55,7 @@ export async function connectProvider(provider) {
   setProviderStatus(provider, 'Démarrage de la connexion…', 'warn');
 
   try {
-    const response = await bridgeFetch(`/providers/${provider}/login`, { method: 'POST' });
+    const response = await providerRequest(`/providers/${provider}/login`, { method: 'POST' });
     const data = response.data || {};
     if (!response.ok) throw new Error(response.error || data.error || 'Impossible de lancer la connexion.');
 
@@ -89,7 +86,7 @@ export async function connectProvider(provider) {
 }
 
 export async function logoutProvider(provider) {
-  const response = await bridgeFetch(`/providers/${provider}/logout`, { method: 'POST' });
+  const response = await providerRequest(`/providers/${provider}/logout`, { method: 'POST' });
   if (!response.ok) {
     setProviderStatus(provider, response.error || response.data?.error || 'Déconnexion impossible.', 'warn');
     return;

@@ -12,9 +12,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Check JavaScript syntax
         run: |
           find extension native-host -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+      - name: Check Python syntax
+        run: python -m compileall -q transcription-service/app
       - name: Validate extension manifest
         run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
       - name: Smoke test Native Messaging protocol
