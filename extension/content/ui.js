@@ -87,9 +87,16 @@
         </header>
         <div class="pa-toolbar">
           <span class="pa-pill" id="pa-time">0:00</span>
-          <span class="pa-pill pa-transcript-pill" id="pa-transcript" role="button" tabindex="0" title="Cliquer pour vérifier la transcription autour du moment actuel">Transcription...</span>
           <span class="pa-pill" id="pa-provider">Codex</span>
           <span class="pa-status" id="pa-status"></span>
+        </div>
+        <div class="pa-transcript-bar" id="pa-transcript-bar">
+          <div class="pa-transcript-copy">
+            <span class="pa-transcript-label">Contexte vidéo</span>
+            <strong id="pa-transcript">Recherche transcription…</strong>
+            <span class="pa-transcript-detail" id="pa-transcript-detail">Vérification des sous-titres YouTube.</span>
+          </div>
+          <button class="pa-transcript-preview" id="pa-transcript-preview" type="button" disabled>Voir la transcription</button>
         </div>
         <div class="pa-messages" id="pa-messages">
           <div class="pa-empty" id="pa-empty">Pose une question sur ce qui vient d'être dit dans la vidéo.</div>
@@ -110,14 +117,7 @@
       }
     });
 
-    const transcriptBadge = PA.qs('#pa-transcript');
-    transcriptBadge?.addEventListener('click', () => PA.showTranscriptPreview?.());
-    transcriptBadge?.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        PA.showTranscriptPreview?.();
-      }
-    });
+    PA.qs('#pa-transcript-preview')?.addEventListener('click', () => PA.showTranscriptPreview?.());
 
     PA.applyAppearance();
     PA.loadHistory();
