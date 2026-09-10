@@ -184,17 +184,24 @@
     const data = response?.data || {};
 
     if (!response?.ok) {
-      setProviderStatus(provider, response?.error || 'Bridge local hors ligne', 'warn');
+      setProviderStatus(provider, response?.error || 'Fournisseur indisponible', 'warn');
+      return false;
+    }
+
+    if (provider === 'codex' && data.pending) {
+      const code = data.userCode ? ` · code ${data.userCode}` : '';
+      const error = data.error ? ` · ${data.error}` : '';
+      setProviderStatus(provider, `Connexion ChatGPT en attente${code}${error}`, 'warn');
       return false;
     }
 
     if (!data.installed) {
-      setProviderStatus(provider, provider === 'codex' ? 'Codex CLI non installé' : 'Antigravity CLI non installé', 'warn');
+      setProviderStatus(provider, provider === 'codex' ? 'Codex indisponible' : 'Antigravity CLI non installé', 'warn');
       return false;
     }
 
     if (!data.connected) {
-      setProviderStatus(provider, 'Non connecté', 'warn');
+      setProviderStatus(provider, data.error || 'Non connecté', 'warn');
       return false;
     }
 
@@ -234,12 +241,12 @@
       setProviderStatus(
         provider,
         provider === 'codex'
-          ? 'Connexion ChatGPT ouverte dans le navigateur…'
+          ? `Connexion ChatGPT ouverte${data.userCode ? ` · entre le code ${data.userCode}` : ''}`
           : 'Antigravity ouvert. Termine le Google OAuth dans le navigateur…',
         'warn',
       );
 
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 180; i++) {
         await new Promise(resolve => setTimeout(resolve, 3000));
         const connected = await refreshProvider(provider, { withModels: false });
         if (connected) {
