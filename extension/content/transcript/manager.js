@@ -1,59 +1,12 @@
 (() => {
   const PA = globalThis.ProfessorAskContent;
-  const POLL_INTERVAL_MS = 2500;
   let loadGeneration = 0;
-
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  function transcriptLanguage() {
-    const language = PA.state.settings.transcriptLanguage;
-    return language === 'fr' || language === 'en' ? language : 'auto';
-  }
 
   function applyTranscript(segments, source, status, diagnostics = null) {
     PA.state.transcript = Array.isArray(segments) ? segments : [];
     PA.state.transcriptSource = source;
     PA.state.transcriptDiagnostics = diagnostics || null;
     PA.setTranscriptStatus(status, 100, null, diagnostics);
-  }
-
-  async function waitForGeneratedTranscript(videoId, language, generation, initial) {
-    let snapshot = initial;
-
-    while (generation === loadGeneration && PA.state.videoId === videoId) {
-      if (snapshot?.status === 'ready' && Array.isArray(snapshot.segments)) {
-        if (!snapshot.segments.length) {
-          PA.setTranscriptStatus('failed', 100, 'Whisper a terminé sans produire de segments exploitables.');
-          return;
-        }
-        applyTranscript(snapshot.segments, 'generated', 'generated-ready', snapshot.diagnostics || null);
-        return;
-      }
-
-      if (snapshot?.status === 'failed') {
-        PA.setTranscriptStatus('failed', snapshot.progress, snapshot.error || 'La transcription a échoué.');
-        return;
-      }
-
-      PA.setTranscriptStatus(snapshot?.status || 'queued', snapshot?.progress || 0, snapshot?.error || null);
-      await sleep(POLL_INTERVAL_MS);
-
-      if (generation !== loadGeneration || PA.state.videoId !== videoId) return;
-      snapshot = await PA.getRemoteTranscriptStatus(videoId, language);
-    }
-  }
-
-  async function startGeneratedTranscript(videoId, generation) {
-    const language = transcriptLanguage();
-    try {
-      const initial = await PA.startRemoteTranscript(videoId, language);
-      await waitForGeneratedTranscript(videoId, language, generation, initial);
-    } catch (error) {
-      if (generation !== loadGeneration || PA.state.videoId !== videoId) return;
-      PA.setTranscriptStatus('failed', null, error.message);
-    }
   }
 
   PA.transcriptContextAt = function transcriptContextAt(time) {
@@ -91,7 +44,12 @@
       if (generation !== loadGeneration || PA.state.videoId !== videoId) return;
     }
 
-    PA.setTranscriptStatus('queued', 0);
-    void startGeneratedTranscript(videoId, generation);
+    // No network/local companion fallback is allowed here. The next source must
+    // execute entirely inside the extension package (Whisper WASM/WebGPU).
+    PA.setTranscriptStatus(
+      'local-engine-pending',
+      null,
+      'Aucun sous-titre YouTube. Le fallback doit être exécuté directement dans l’extension ; aucun serveur local ou distant n’est utilisé.',
+    );
   };
 })();

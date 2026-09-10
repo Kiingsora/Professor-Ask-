@@ -1,5 +1,4 @@
 import { routeRequest } from './router.js';
-import { routeTranscriptRequest } from './transcription/client.js';
 
 chrome.action.onClicked.addListener(() => {
   chrome.runtime.openOptionsPage();
@@ -24,13 +23,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     routeRequest(message)
       .then(sendResponse)
       .catch(error => sendResponse({ ok: false, status: 0, data: null, error: error?.message || String(error) }));
-    return true;
-  }
-
-  if (message?.type === 'TRANSCRIPT_REQUEST') {
-    routeTranscriptRequest(message)
-      .then(data => sendResponse({ ok: true, data }))
-      .catch(error => sendResponse({ ok: false, data: null, error: error?.message || String(error) }));
     return true;
   }
 });

@@ -10,9 +10,6 @@
     }
     if (diagnostics.detected_language) parts.push(`langue ${diagnostics.detected_language}`);
     if (diagnostics.model) parts.push(`modèle ${diagnostics.model}`);
-    if (Number.isFinite(Number(diagnostics.coverage_ratio))) {
-      parts.push(`couverture ${Math.round(Number(diagnostics.coverage_ratio) * 100)} %`);
-    }
     return parts.join(' · ');
   }
 
@@ -56,35 +53,11 @@
       return;
     }
 
-    if (status === 'queued') {
-      badge.textContent = 'Aucun sous-titre · Whisper va démarrer';
-      if (detail) detail.textContent = 'Le service de transcription prépare une transcription complète de la vidéo.';
-      bar?.classList.add('is-working');
+    if (status === 'local-engine-pending') {
+      badge.textContent = 'Aucun sous-titre YouTube';
+      if (detail) detail.textContent = error || 'Le moteur de transcription intégré n’est pas encore disponible dans cette build.';
+      bar?.classList.add('is-error');
       updatePreviewButton(false);
-      return;
-    }
-
-    if (status === 'downloading') {
-      badge.textContent = `Whisper · préparation audio ${Math.round(PA.state.transcriptProgress || 0)} %`;
-      if (detail) detail.textContent = 'L’audio de la vidéo est en cours de préparation.';
-      bar?.classList.add('is-working');
-      updatePreviewButton(false);
-      return;
-    }
-
-    if (status === 'transcribing') {
-      badge.textContent = `Whisper · transcription ${Math.round(PA.state.transcriptProgress || 0)} %`;
-      if (detail) detail.textContent = 'Whisper produit les segments texte avec leurs timestamps.';
-      bar?.classList.add('is-working');
-      updatePreviewButton(false);
-      return;
-    }
-
-    if (status === 'generated-ready') {
-      badge.textContent = 'Whisper · transcription récupérée';
-      if (detail) detail.textContent = describeDiagnostics(details) || `${PA.state.transcript.length} segments horodatés disponibles.`;
-      bar?.classList.add('is-ready');
-      updatePreviewButton(true);
       return;
     }
 

@@ -1,16 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Professor Ask",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Discuss YouTube videos with Codex or Google Antigravity using timestamped transcript context.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkUJNlOEw7E1LHQqkIXHlRshYG5m2rk/y8dkgG1xKZhv+RpCUQHoZz35kvdSelBt+znaJRcBClc78GDDKTxMYu5eZdykMVAZZHBbMbTCaf/jOE5JJ36dZb+yMFvucY2zoUaKeKR/MJcPT54bLBARsQhPzAj+UnKm6GIF4xbCg2/uyiNwVt7oL5nsgTxGlHygOVe6PAfmJUA8X87sB59Hp4XFQeIVt2AmJS9d3+Wy9+sPiRD3rixaa++5ZamGPcd4x9/cX6r5H8QHj9iXwQwC0M60d8YsVZt+R9cYo9DakNV+3qjkuzgCOkdW18rUTZHPGExuBMlIdkKrfIwPPOtlzNQIDAQAB",
   "permissions": ["storage", "tabs", "nativeMessaging"],
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://auth.openai.com/*",
-    "https://chatgpt.com/backend-api/codex/*",
-    "http://127.0.0.1:43120/*",
-    "http://localhost:43120/*"
+    "https://chatgpt.com/backend-api/codex/*"
   ],
   "background": {
     "service_worker": "background/index.js",
@@ -30,7 +28,6 @@
         "content/core.js",
         "content/history.js",
         "content/transcript/youtube.js",
-        "content/transcript/remote.js",
         "content/transcript/status.js",
         "content/transcript/manager.js",
         "content/transcript/preview.js",
