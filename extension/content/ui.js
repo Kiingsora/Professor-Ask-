@@ -87,6 +87,10 @@
         </header>
         <div class="pa-toolbar">
           <span class="pa-pill" id="pa-time">0:00</span>
+          <span class="pa-captions-state" id="pa-captions-state" title="État des sous-titres YouTube">
+            <span class="pa-caption-led is-checking" id="pa-caption-led" aria-hidden="true"></span>
+            <span id="pa-caption-led-text">Sous-titres : vérification…</span>
+          </span>
           <span class="pa-pill" id="pa-provider">Codex</span>
           <span class="pa-status" id="pa-status"></span>
         </div>
