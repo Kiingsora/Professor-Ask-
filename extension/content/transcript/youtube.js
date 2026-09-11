@@ -47,7 +47,7 @@
     return 0;
   }
 
-  function chooseTrack(tracks) {
+  function rankTracks(tracks) {
     const preferred = PA.state.settings.transcriptLanguage;
     const browserLanguage = (navigator.language || '').split('-')[0];
 
@@ -57,7 +57,8 @@
         index,
         score: languageScore(track, preferred, browserLanguage) + (track.kind === 'asr' ? 0 : 100),
       }))
-      .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.track || null;
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .map(item => item.track);
   }
 
   function trackLabel(track) {
@@ -67,17 +68,15 @@
       || null;
   }
 
-  PA.fetchYoutubeTranscript = async function fetchYoutubeTranscript() {
-    const html = await fetch(location.href, { credentials: 'include' }).then(response => response.text());
-    const json = extractJsonArrayAfter(html, '"captionTracks":');
-    if (!json) throw new Error('no captions');
+  async function fetchTrack(track) {
+    if (!track?.baseUrl) return null;
 
-    const tracks = JSON.parse(json);
-    const preferred = chooseTrack(tracks);
-    if (!preferred?.baseUrl) throw new Error('no caption url');
+    const url = new URL(track.baseUrl);
+    url.searchParams.set('fmt', 'json3');
+    const response = await fetch(url.toString(), { credentials: 'include' });
+    if (!response.ok) throw new Error(`caption HTTP ${response.status}`);
 
-    const separator = preferred.baseUrl.includes('?') ? '&' : '?';
-    const data = await fetch(`${preferred.baseUrl}${separator}fmt=json3`, { credentials: 'include' }).then(response => response.json());
+    const data = await response.json();
     const segments = (data.events || [])
       .filter(event => event.segs?.length)
       .map(event => ({
@@ -87,7 +86,7 @@
       }))
       .filter(item => item.text);
 
-    if (!segments.length) throw new Error('empty captions');
+    if (!segments.length) return null;
 
     const last = segments[segments.length - 1];
     return {
@@ -96,10 +95,34 @@
         segment_count: segments.length,
         first_timestamp: segments[0].start,
         last_timestamp: last.start + last.duration,
-        detected_language: preferred.languageCode || null,
-        source_kind: preferred.kind === 'asr' ? 'automatic' : 'manual',
-        track_label: trackLabel(preferred),
+        detected_language: track.languageCode || null,
+        source_kind: track.kind === 'asr' ? 'automatic' : 'manual',
+        track_label: trackLabel(track),
       },
     };
+  }
+
+  PA.fetchYoutubeTranscript = async function fetchYoutubeTranscript() {
+    const pageResponse = await fetch(location.href, { credentials: 'include', cache: 'no-store' });
+    if (!pageResponse.ok) throw new Error(`youtube page HTTP ${pageResponse.status}`);
+
+    const html = await pageResponse.text();
+    const json = extractJsonArrayAfter(html, '"captionTracks":');
+    if (!json) throw new Error('no captions');
+
+    const tracks = JSON.parse(json);
+    if (!Array.isArray(tracks) || !tracks.length) throw new Error('no captions');
+
+    let lastError = null;
+    for (const track of rankTracks(tracks)) {
+      try {
+        const result = await fetchTrack(track);
+        if (result) return result;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('empty captions');
   };
 })();
