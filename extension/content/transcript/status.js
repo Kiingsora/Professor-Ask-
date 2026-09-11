@@ -9,8 +9,16 @@
       parts.push(`${PA.fmt(diagnostics.first_timestamp)}–${PA.fmt(diagnostics.last_timestamp)}`);
     }
     if (diagnostics.detected_language) parts.push(`langue ${diagnostics.detected_language}`);
+    if (diagnostics.retrieval_method) parts.push(diagnostics.retrieval_method);
     if (diagnostics.model) parts.push(`modèle ${diagnostics.model}`);
     return parts.join(' · ');
+  }
+
+  function shortErrorLabel(error) {
+    const text = String(error || '').replace(/^Les sous-titres n’ont pas pu être récupérés\s*\(/i, '').replace(/\)\.?$/, '');
+    const technical = text.match(/(?:get_panel|get_transcript|caption)[^;,.]{0,40}HTTP\s+\d{3}(?:\s+[A-Z_]+)?/i);
+    if (technical) return technical[0].replace(/^.*?(get_panel|get_transcript|caption)/i, '$1');
+    return text.length > 46 ? `${text.slice(0, 43)}…` : text;
   }
 
   function updatePreviewButton(enabled) {
@@ -78,10 +86,11 @@
     }
 
     if (status === 'failed') {
+      const fullError = error || 'Erreur pendant la récupération des sous-titres YouTube.';
       badge.textContent = 'Transcription indisponible';
-      if (detail) detail.textContent = error || 'Impossible de récupérer une transcription pour cette vidéo.';
+      if (detail) detail.textContent = fullError;
       bar?.classList.add('is-error');
-      updateCaptionsLed('is-error', 'Sous-titres : erreur', error || 'Erreur pendant la récupération des sous-titres YouTube.');
+      updateCaptionsLed('is-error', `Sous-titres : erreur · ${shortErrorLabel(fullError)}`, fullError);
       updatePreviewButton(false);
       return;
     }
