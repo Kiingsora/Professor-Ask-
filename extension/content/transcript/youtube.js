@@ -1,5 +1,7 @@
 (() => {
   const PA = globalThis.ProfessorAskContent;
+  const REQUEST_TYPE = 'PROFESSOR_ASK_YOUTUBE_TRANSCRIPT_REQUEST';
+  const RESPONSE_TYPE = 'PROFESSOR_ASK_YOUTUBE_TRANSCRIPT_RESPONSE';
 
   function decodeHtml(text) {
     const textarea = document.createElement('textarea');
@@ -76,7 +78,10 @@
     const response = await fetch(url.toString(), { credentials: 'include' });
     if (!response.ok) throw new Error(`caption HTTP ${response.status}`);
 
-    const data = await response.json();
+    const raw = await response.text();
+    if (!raw.trim()) return null;
+
+    const data = JSON.parse(raw);
     const segments = (data.events || [])
       .filter(event => event.segs?.length)
       .map(event => ({
@@ -98,21 +103,59 @@
         detected_language: track.languageCode || null,
         source_kind: track.kind === 'asr' ? 'automatic' : 'manual',
         track_label: trackLabel(track),
+        retrieval_method: 'timedtext',
       },
     };
   }
 
-  PA.fetchYoutubeTranscript = async function fetchYoutubeTranscript() {
+  function requestLiveTranscript(videoId, timeoutMs = 8000) {
+    return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      let timeout;
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        window.removeEventListener('message', onMessage);
+      };
+
+      const onMessage = event => {
+        if (event.source !== window) return;
+        const message = event.data;
+        if (!message || message.source !== 'professor-ask-youtube-page') return;
+        if (message.type !== RESPONSE_TYPE || message.requestId !== requestId) return;
+
+        cleanup();
+        resolve(message);
+      };
+
+      window.addEventListener('message', onMessage);
+      timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('live YouTube transcript timeout'));
+      }, timeoutMs);
+
+      window.postMessage({
+        source: 'professor-ask-extension',
+        type: REQUEST_TYPE,
+        requestId,
+        videoId,
+      }, '*');
+    });
+  }
+
+  async function tracksFromWatchPage() {
     const pageResponse = await fetch(location.href, { credentials: 'include', cache: 'no-store' });
     if (!pageResponse.ok) throw new Error(`youtube page HTTP ${pageResponse.status}`);
 
     const html = await pageResponse.text();
     const json = extractJsonArrayAfter(html, '"captionTracks":');
-    if (!json) throw new Error('no captions');
+    if (!json) return [];
 
     const tracks = JSON.parse(json);
-    if (!Array.isArray(tracks) || !tracks.length) throw new Error('no captions');
+    return Array.isArray(tracks) ? tracks : [];
+  }
 
+  async function tryTimedTextTracks(tracks) {
     let lastError = null;
     for (const track of rankTracks(tracks)) {
       try {
@@ -122,7 +165,46 @@
         lastError = error;
       }
     }
+    if (lastError) throw lastError;
+    return null;
+  }
 
-    throw lastError || new Error('empty captions');
+  PA.fetchYoutubeTranscript = async function fetchYoutubeTranscript() {
+    const videoId = PA.state.videoId || PA.getVideoId();
+    let liveResult = null;
+    let liveError = null;
+
+    try {
+      liveResult = await requestLiveTranscript(videoId);
+      if (liveResult?.ok && Array.isArray(liveResult.segments) && liveResult.segments.length) {
+        return {
+          segments: liveResult.segments,
+          diagnostics: liveResult.diagnostics || null,
+        };
+      }
+    } catch (error) {
+      liveError = error;
+    }
+
+    let tracks = Array.isArray(liveResult?.tracks) ? liveResult.tracks : [];
+    if (!tracks.length) {
+      try {
+        tracks = await tracksFromWatchPage();
+      } catch (error) {
+        if (!liveError) liveError = error;
+      }
+    }
+
+    if (tracks.length) {
+      const direct = await tryTimedTextTracks(tracks);
+      if (direct) return direct;
+    }
+
+    if (liveResult?.errorCode === 'no_captions' && !tracks.length) throw new Error('no captions');
+
+    const reason = liveResult?.error || liveError?.message;
+    if (reason) throw new Error(`YouTube transcript retrieval failed: ${reason}`);
+    if (!tracks.length) throw new Error('no captions');
+    throw new Error('YouTube reported captions but returned no transcript data');
   };
 })();
