@@ -13,6 +13,14 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  function shouldRetry(error) {
+    const message = String(error?.message || '');
+    if (message === 'no captions') return false;
+    if (/HTTP\s+4\d\d/i.test(message)) return false;
+    if (/empty captions|returned no transcript data/i.test(message)) return false;
+    return true;
+  }
+
   async function fetchYoutubeTranscriptWithRetry(generation, videoId) {
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -21,7 +29,7 @@
         return await PA.fetchYoutubeTranscript();
       } catch (error) {
         lastError = error;
-        if (error?.message === 'no captions') break;
+        if (!shouldRetry(error)) break;
         if (attempt < 2) await sleep(600 * (attempt + 1));
       }
     }
