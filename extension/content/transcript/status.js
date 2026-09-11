@@ -22,6 +22,18 @@
       : 'La transcription doit être prête avant de pouvoir l’afficher.';
   }
 
+  function updateCaptionsLed(state, text, title = '') {
+    const led = PA.qs('#pa-caption-led');
+    const label = PA.qs('#pa-caption-led-text');
+    const container = PA.qs('#pa-captions-state');
+    if (!led || !label) return;
+
+    led.classList.remove('is-checking', 'is-ok', 'is-missing', 'is-error');
+    led.classList.add(state);
+    label.textContent = text;
+    if (container) container.title = title || text;
+  }
+
   PA.setTranscriptStatus = function setTranscriptStatus(status, progress = null, error = null, diagnostics = null) {
     PA.state.transcriptStatus = status;
     PA.state.transcriptProgress = Number.isFinite(Number(progress)) ? Number(progress) : null;
@@ -38,25 +50,29 @@
 
     if (status === 'checking-youtube') {
       badge.textContent = 'Recherche des sous-titres YouTube…';
-      if (detail) detail.textContent = 'Professor Ask vérifie d’abord les sous-titres disponibles sur la vidéo.';
+      if (detail) detail.textContent = 'Professor Ask vérifie les pistes de sous-titres disponibles sur la vidéo.';
       bar?.classList.add('is-working');
+      updateCaptionsLed('is-checking', 'Sous-titres : vérification…', 'Recherche des sous-titres YouTube en cours.');
       updatePreviewButton(false);
       return;
     }
 
     if (status === 'youtube-ready') {
       const kind = details?.source_kind === 'manual' ? 'manuels' : details?.source_kind === 'automatic' ? 'automatiques' : '';
+      const sourceText = kind ? `Sous-titres : OK · ${kind}` : 'Sous-titres : OK';
       badge.textContent = `Sous-titres YouTube${kind ? ` ${kind}` : ''} récupérés`;
       if (detail) detail.textContent = describeDiagnostics(details) || 'La transcription horodatée YouTube est prête.';
       bar?.classList.add('is-ready');
+      updateCaptionsLed('is-ok', sourceText, describeDiagnostics(details) || 'Sous-titres YouTube récupérés.');
       updatePreviewButton(true);
       return;
     }
 
     if (status === 'local-engine-pending') {
       badge.textContent = 'Aucun sous-titre YouTube';
-      if (detail) detail.textContent = error || 'Le moteur de transcription intégré n’est pas encore disponible dans cette build.';
+      if (detail) detail.textContent = error || 'Aucune piste de sous-titres exploitable n’a été trouvée.';
       bar?.classList.add('is-error');
+      updateCaptionsLed('is-missing', 'Sous-titres : absents', error || 'Aucun sous-titre YouTube exploitable trouvé.');
       updatePreviewButton(false);
       return;
     }
@@ -65,12 +81,14 @@
       badge.textContent = 'Transcription indisponible';
       if (detail) detail.textContent = error || 'Impossible de récupérer une transcription pour cette vidéo.';
       bar?.classList.add('is-error');
+      updateCaptionsLed('is-error', 'Sous-titres : erreur', error || 'Erreur pendant la récupération des sous-titres YouTube.');
       updatePreviewButton(false);
       return;
     }
 
     badge.textContent = 'Transcription…';
     if (detail) detail.textContent = error || '';
+    updateCaptionsLed('is-checking', 'Sous-titres : vérification…');
     updatePreviewButton(false);
   };
 })();
