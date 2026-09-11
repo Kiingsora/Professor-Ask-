@@ -1,7 +1,7 @@
 import { codexProvider } from '../providers/codex/index.js';
 import { nativeRequest } from './native-messaging.js';
 
-const VERSION = '0.8.0';
+const VERSION = '0.9.1';
 
 function parsePath(rawPath) {
   try {
@@ -13,6 +13,11 @@ function parsePath(rawPath) {
 
 function okResponse(data, transport) {
   return { ok: true, status: 200, data, transport, error: null };
+}
+
+function hasTranscriptContext(body) {
+  return Array.isArray(body?.transcript)
+    && body.transcript.some(segment => String(segment?.text || '').trim());
 }
 
 async function directCodex(operation, message) {
@@ -50,6 +55,10 @@ export async function routeRequest(message) {
     }
 
     if (pathname === '/chat') {
+      if (!hasTranscriptContext(message.body)) {
+        throw new Error('Aucune transcription vidéo valide. Requête IA bloquée pour éviter une réponse basée uniquement sur le web.');
+      }
+
       const provider = message.body?.provider || 'codex';
       if (provider === 'codex') return okResponse(await directCodex('chat', message), 'direct-codex-oauth');
       if (provider === 'antigravity') {
