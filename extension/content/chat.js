@@ -15,16 +15,6 @@
     PA.renderStatus();
   };
 
-  function transcriptNotReadyMessage() {
-    const status = PA.state.transcriptStatus;
-    if (status === 'checking-youtube') return 'Je vérifie les sous-titres YouTube. Réessaie dans quelques secondes.';
-    if (status === 'queued' || status === 'downloading' || status === 'transcribing') {
-      return `La transcription de cette vidéo est encore en cours${PA.state.transcriptProgress != null ? ` (${Math.round(PA.state.transcriptProgress)} %)` : ''}. Attends qu’elle soit prête avant de poser une question sur le passage.`;
-    }
-    if (status === 'failed') return `La transcription est indisponible${PA.state.transcriptError ? ` : ${PA.state.transcriptError}` : '.'}`;
-    return 'Aucune transcription exploitable n’est disponible pour cette vidéo.';
-  }
-
   PA.sendQuestion = async function sendQuestion() {
     if (PA.state.busy) return;
 
@@ -39,19 +29,8 @@
     }
 
     const timestamp = PA.currentTime();
-    if (!PA.state.transcript.length) {
-      PA.addMessage('error', transcriptNotReadyMessage());
-      return;
-    }
-
-    const transcriptContext = PA.transcriptContextAt(timestamp);
-    if (!transcriptContext.length) {
-      PA.addMessage(
-        'error',
-        `La transcription est chargée, mais aucun segment ne couvre le contexte autour de ${PA.fmt(timestamp)}. La question n’a pas été envoyée à ${PA.providerName()} afin d’éviter une réponse inventée.`,
-      );
-      return;
-    }
+    const transcriptContext = PA.state.transcript.length ? PA.transcriptContextAt(timestamp) : [];
+    const hasVideoContext = transcriptContext.length > 0;
 
     const video = PA.qs('video');
     if (PA.state.settings.pauseOnQuestion && video && !video.paused) video.pause();
@@ -62,7 +41,9 @@
     send.disabled = true;
 
     const model = PA.selectedModelName();
-    const sourceLabel = PA.state.transcriptSource === 'generated' ? 'transcription IA' : 'sous-titres YouTube';
+    const sourceLabel = hasVideoContext
+      ? (PA.state.transcriptSource === 'generated' ? 'transcription IA' : 'sous-titres YouTube')
+      : 'web uniquement · aucun contexte vidéo';
     const placeholder = PA.addMessage(
       'assistant',
       'Réflexion…',
@@ -86,8 +67,9 @@
           timestamp,
           question,
           transcript: transcriptContext,
-          transcriptSource: PA.state.transcriptSource,
-          transcriptDiagnostics: PA.state.transcriptDiagnostics || null,
+          transcriptAvailable: hasVideoContext,
+          transcriptSource: hasVideoContext ? PA.state.transcriptSource : 'none',
+          transcriptDiagnostics: hasVideoContext ? (PA.state.transcriptDiagnostics || null) : null,
           settings: {
             responseLanguage: PA.state.settings.responseLanguage,
             responseStyle: PA.state.settings.responseStyle,
