@@ -1,4 +1,5 @@
 const NATIVE_HOST = 'com.professorask.bridge';
+const ext = globalThis.browser ?? globalThis.chrome;
 
 let nativePort = null;
 let nextNativeId = 1;
@@ -10,7 +11,7 @@ function friendlyNativeError(message) {
     return 'Antigravity nécessite encore son client local dans cette version. ChatGPT/Codex fonctionne directement dans le navigateur.';
   }
   if (/access.*native messaging|not allowed to access native messaging/i.test(text)) {
-    return 'Chrome refuse l’accès au connecteur Antigravity local.';
+    return 'Le navigateur refuse l’accès au connecteur Antigravity local.';
   }
   if (/disconnected|native host has exited|communication with the native messaging host/i.test(text)) {
     return 'Le connecteur Antigravity local s’est arrêté.';
@@ -30,7 +31,7 @@ function rejectPending(error) {
 function ensurePort() {
   if (nativePort) return nativePort;
 
-  const port = chrome.runtime.connectNative(NATIVE_HOST);
+  const port = ext.runtime.connectNative(NATIVE_HOST);
   nativePort = port;
 
   port.onMessage.addListener(message => {
@@ -45,7 +46,7 @@ function ensurePort() {
   });
 
   port.onDisconnect.addListener(() => {
-    const lastError = chrome.runtime.lastError?.message || 'Native Messaging déconnecté.';
+    const lastError = ext.runtime.lastError?.message || 'Native Messaging déconnecté.';
     if (nativePort === port) nativePort = null;
     rejectPending(lastError);
   });

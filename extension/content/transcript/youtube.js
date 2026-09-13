@@ -70,6 +70,21 @@
       || null;
   }
 
+  function withCaptionDiagnostics(diagnostics, tracks) {
+    const list = Array.isArray(tracks) ? tracks : [];
+    return {
+      ...(diagnostics || {}),
+      caption_track_count: list.length,
+      caption_languages: [...new Set(list.map(track => track?.languageCode).filter(Boolean))],
+    };
+  }
+
+  function transcriptError(message, diagnostics = null) {
+    const error = new Error(message);
+    error.diagnostics = diagnostics;
+    return error;
+  }
+
   async function fetchTrack(track) {
     if (!track?.baseUrl) return null;
 
@@ -177,9 +192,10 @@
     try {
       liveResult = await requestLiveTranscript(videoId);
       if (liveResult?.ok && Array.isArray(liveResult.segments) && liveResult.segments.length) {
+        const tracks = Array.isArray(liveResult.tracks) ? liveResult.tracks : [];
         return {
           segments: liveResult.segments,
-          diagnostics: liveResult.diagnostics || null,
+          diagnostics: withCaptionDiagnostics(liveResult.diagnostics, tracks),
         };
       }
     } catch (error) {
@@ -195,16 +211,27 @@
       }
     }
 
+    let directError = null;
     if (tracks.length) {
-      const direct = await tryTimedTextTracks(tracks);
-      if (direct) return direct;
+      try {
+        const direct = await tryTimedTextTracks(tracks);
+        if (direct) {
+          direct.diagnostics = withCaptionDiagnostics(direct.diagnostics, tracks);
+          return direct;
+        }
+      } catch (error) {
+        directError = error;
+      }
     }
 
-    if (liveResult?.errorCode === 'no_captions' && !tracks.length) throw new Error('no captions');
+    const diagnostics = withCaptionDiagnostics(liveResult?.diagnostics, tracks);
+    if (liveResult?.errorCode === 'no_captions' && !tracks.length) {
+      throw transcriptError('no captions', diagnostics);
+    }
 
-    const reason = liveResult?.error || liveError?.message;
-    if (reason) throw new Error(`YouTube transcript retrieval failed: ${reason}`);
-    if (!tracks.length) throw new Error('no captions');
-    throw new Error('YouTube reported captions but returned no transcript data');
+    const reason = liveResult?.error || directError?.message || liveError?.message;
+    if (reason) throw transcriptError(`YouTube transcript retrieval failed: ${reason}`, diagnostics);
+    if (!tracks.length) throw transcriptError('no captions', diagnostics);
+    throw transcriptError('YouTube reported captions but returned no transcript data', diagnostics);
   };
 })();

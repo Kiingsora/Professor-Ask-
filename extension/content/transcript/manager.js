@@ -13,14 +13,6 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  function shouldRetry(error) {
-    const message = String(error?.message || '');
-    if (message === 'no captions') return false;
-    if (/HTTP\s+4\d\d/i.test(message)) return false;
-    if (/empty captions|returned no transcript data/i.test(message)) return false;
-    return true;
-  }
-
   async function fetchYoutubeTranscriptWithRetry(generation, videoId) {
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -29,7 +21,7 @@
         return await PA.fetchYoutubeTranscript();
       } catch (error) {
         lastError = error;
-        if (!shouldRetry(error)) break;
+        if (error?.message === 'no captions') break;
         if (attempt < 2) await sleep(600 * (attempt + 1));
       }
     }
@@ -69,12 +61,14 @@
       return;
     } catch (error) {
       if (generation !== loadGeneration || PA.state.videoId !== videoId) return;
+      const diagnostics = error?.diagnostics || null;
 
       if (error?.message === 'no captions') {
         PA.setTranscriptStatus(
           'local-engine-pending',
           null,
           'Aucune piste de sous-titres YouTube n’a été détectée sur cette vidéo.',
+          diagnostics,
         );
         return;
       }
@@ -82,7 +76,8 @@
       PA.setTranscriptStatus(
         'failed',
         null,
-        `Les sous-titres n’ont pas pu être récupérés (${error?.message || 'erreur inconnue'}).`,
+        `La transcription YouTube n’a pas pu être récupérée (${error?.message || 'erreur inconnue'}).`,
+        diagnostics,
       );
     }
   };

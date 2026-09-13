@@ -1,19 +1,21 @@
 import { routeRequest } from './router.js';
 
-chrome.action.onClicked.addListener(() => {
-  chrome.runtime.openOptionsPage();
+const ext = globalThis.browser ?? globalThis.chrome;
+
+ext.action.onClicked.addListener(() => {
+  ext.runtime.openOptionsPage();
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+ext.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'OPEN_OPTIONS') {
-    chrome.runtime.openOptionsPage()
+    ext.runtime.openOptionsPage()
       .then(() => sendResponse({ ok: true }))
       .catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
   if (message?.type === 'OPEN_EXTERNAL' && typeof message.url === 'string') {
-    chrome.tabs.create({ url: message.url })
+    ext.tabs.create({ url: message.url })
       .then(() => sendResponse({ ok: true }))
       .catch(error => sendResponse({ ok: false, error: error.message }));
     return true;

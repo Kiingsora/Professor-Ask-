@@ -1,5 +1,6 @@
 node_modules/
 .DS_Store
+dist/
 
 native-host/ProfessorAskNativeHost.exe
 native-host/com.professorask.bridge.json

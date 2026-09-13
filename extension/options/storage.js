@@ -1,8 +1,8 @@
-import { $, DEFAULTS, store } from './core.js';
+import { $, DEFAULTS, ext, store } from './core.js';
 import { populateModels, readForm, setProviderPanels, setSaveState, writeForm } from './form.js';
 
 export async function loadSettings() {
-  const saved = await chrome.storage.sync.get(DEFAULTS);
+  const saved = await ext.storage.sync.get(DEFAULTS);
   writeForm(saved);
   setSaveState('Enregistré', 'ok');
 }
@@ -14,15 +14,15 @@ export function scheduleSave() {
   clearTimeout(store.saveTimer);
 
   store.saveTimer = setTimeout(async () => {
-    await chrome.storage.sync.set(store.settings);
+    await ext.storage.sync.set(store.settings);
     setSaveState('Enregistré', 'ok');
   }, 180);
 }
 
 export async function clearHistory() {
-  const all = await chrome.storage.local.get(null);
+  const all = await ext.storage.local.get(null);
   const keys = Object.keys(all).filter(key => key.startsWith('pa-history:'));
-  if (keys.length) await chrome.storage.local.remove(keys);
+  if (keys.length) await ext.storage.local.remove(keys);
 
   const button = $('clear-history');
   const original = button.textContent;
@@ -35,6 +35,6 @@ export async function resetSettings() {
   writeForm(store.settings);
   populateModels('codex', store.modelCatalogs.codex);
   populateModels('antigravity', store.modelCatalogs.antigravity);
-  await chrome.storage.sync.set(store.settings);
+  await ext.storage.sync.set(store.settings);
   setSaveState('Paramètres réinitialisés', 'ok');
 }

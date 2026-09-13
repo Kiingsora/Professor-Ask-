@@ -1,12 +1,13 @@
 (() => {
   const PA = globalThis.ProfessorAskContent;
 
-  function storageGet(key) {
-    return new Promise(resolve => chrome.storage.local.get([key], value => resolve(value[key])));
+  async function storageGet(key) {
+    const value = await PA.ext.storage.local.get([key]);
+    return value?.[key];
   }
 
   function storageSet(key, value) {
-    return new Promise(resolve => chrome.storage.local.set({ [key]: value }, resolve));
+    return PA.ext.storage.local.set({ [key]: value });
   }
 
   function historyKey() {

@@ -21,6 +21,11 @@
     return text.length > 46 ? `${text.slice(0, 43)}…` : text;
   }
 
+  function captionCount(diagnostics) {
+    const value = Number(diagnostics?.caption_track_count);
+    return Number.isFinite(value) ? value : null;
+  }
+
   function updatePreviewButton(enabled) {
     const button = PA.qs('#pa-transcript-preview');
     if (!button) return;
@@ -30,16 +35,95 @@
       : 'La transcription doit être prête avant de pouvoir l’afficher.';
   }
 
-  function updateCaptionsLed(state, text, title = '') {
-    const led = PA.qs('#pa-caption-led');
-    const label = PA.qs('#pa-caption-led-text');
-    const container = PA.qs('#pa-captions-state');
-    if (!led || !label) return;
+  function updateSourceIndicator(source, state, text, title = '') {
+    const icon = PA.qs(`#pa-${source}-icon`);
+    const label = PA.qs(`#pa-${source}-text`);
+    const container = PA.qs(`#pa-${source === 'subtitles' ? 'subtitles' : 'transcription'}-state`);
+    if (!icon || !label) return;
 
-    led.classList.remove('is-checking', 'is-ok', 'is-missing', 'is-error');
-    led.classList.add(state);
+    icon.classList.remove('is-checking', 'is-ok', 'is-missing', 'is-error', 'is-unknown');
+    icon.classList.add(state);
     label.textContent = text;
     if (container) container.title = title || text;
+  }
+
+  function updateSubtitles(status, diagnostics, error) {
+    const count = captionCount(diagnostics);
+
+    if (status === 'checking-youtube') {
+      updateSourceIndicator('subtitles', 'is-checking', 'Sous-titres : vérification…', 'Recherche des pistes de sous-titres YouTube en cours.');
+      return;
+    }
+
+    if (status === 'youtube-ready') {
+      if (count > 0) {
+        const kind = diagnostics?.source_kind === 'manual' ? 'manuels' : diagnostics?.source_kind === 'automatic' ? 'automatiques' : null;
+        updateSourceIndicator(
+          'subtitles',
+          'is-ok',
+          `Sous-titres : OK${kind ? ` · ${kind}` : ''}`,
+          `${count} piste${count > 1 ? 's' : ''} de sous-titres détectée${count > 1 ? 's' : ''}.`,
+        );
+      } else {
+        updateSourceIndicator(
+          'subtitles',
+          'is-unknown',
+          'Sous-titres : non confirmés',
+          'La transcription a été récupérée, mais le lecteur n’a pas exposé de piste de sous-titres distincte.',
+        );
+      }
+      return;
+    }
+
+    if (status === 'local-engine-pending') {
+      updateSourceIndicator('subtitles', 'is-missing', 'Sous-titres : absents', error || 'Aucune piste de sous-titres YouTube détectée.');
+      return;
+    }
+
+    if (status === 'failed') {
+      if (count > 0) {
+        updateSourceIndicator(
+          'subtitles',
+          'is-ok',
+          'Sous-titres : détectés',
+          `${count} piste${count > 1 ? 's' : ''} détectée${count > 1 ? 's' : ''}, mais la transcription n’a pas pu être récupérée.`,
+        );
+      } else {
+        updateSourceIndicator('subtitles', 'is-error', 'Sous-titres : erreur', error || 'Impossible de déterminer les pistes de sous-titres.');
+      }
+      return;
+    }
+
+    updateSourceIndicator('subtitles', 'is-unknown', 'Sous-titres : ?', 'État des sous-titres inconnu.');
+  }
+
+  function updateTranscription(status, diagnostics, error) {
+    if (status === 'checking-youtube') {
+      updateSourceIndicator('transcription', 'is-checking', 'Transcription : vérification…', 'Récupération de la transcription horodatée en cours.');
+      return;
+    }
+
+    if (status === 'youtube-ready') {
+      updateSourceIndicator(
+        'transcription',
+        'is-ok',
+        'Transcription : OK',
+        describeDiagnostics(diagnostics) || 'Transcription horodatée récupérée.',
+      );
+      return;
+    }
+
+    if (status === 'local-engine-pending') {
+      updateSourceIndicator('transcription', 'is-missing', 'Transcription : absente', 'Aucune transcription YouTube disponible.');
+      return;
+    }
+
+    if (status === 'failed') {
+      updateSourceIndicator('transcription', 'is-error', `Transcription : erreur · ${shortErrorLabel(error)}`, error || 'Impossible de récupérer la transcription.');
+      return;
+    }
+
+    updateSourceIndicator('transcription', 'is-unknown', 'Transcription : ?', 'État de la transcription inconnu.');
   }
 
   PA.setTranscriptStatus = function setTranscriptStatus(status, progress = null, error = null, diagnostics = null) {
@@ -55,49 +139,44 @@
 
     const details = diagnostics || PA.state.transcriptDiagnostics || null;
     bar?.classList.remove('is-ready', 'is-working', 'is-error');
+    updateSubtitles(status, details, error);
+    updateTranscription(status, details, error);
 
     if (status === 'checking-youtube') {
-      badge.textContent = 'Recherche des sous-titres YouTube…';
-      if (detail) detail.textContent = 'Professor Ask vérifie les pistes de sous-titres disponibles sur la vidéo.';
+      badge.textContent = 'Recherche du contexte YouTube…';
+      if (detail) detail.textContent = 'Professor Ask vérifie séparément les sous-titres et la transcription horodatée.';
       bar?.classList.add('is-working');
-      updateCaptionsLed('is-checking', 'Sous-titres : vérification…', 'Recherche des sous-titres YouTube en cours.');
       updatePreviewButton(false);
       return;
     }
 
     if (status === 'youtube-ready') {
-      const kind = details?.source_kind === 'manual' ? 'manuels' : details?.source_kind === 'automatic' ? 'automatiques' : '';
-      const sourceText = kind ? `Sous-titres : OK · ${kind}` : 'Sous-titres : OK';
-      badge.textContent = `Sous-titres YouTube${kind ? ` ${kind}` : ''} récupérés`;
+      badge.textContent = 'Transcription YouTube récupérée';
       if (detail) detail.textContent = describeDiagnostics(details) || 'La transcription horodatée YouTube est prête.';
       bar?.classList.add('is-ready');
-      updateCaptionsLed('is-ok', sourceText, describeDiagnostics(details) || 'Sous-titres YouTube récupérés.');
       updatePreviewButton(true);
       return;
     }
 
     if (status === 'local-engine-pending') {
-      badge.textContent = 'Aucun sous-titre YouTube';
-      if (detail) detail.textContent = error || 'Aucune piste de sous-titres exploitable n’a été trouvée.';
+      badge.textContent = 'Contexte vidéo indisponible';
+      if (detail) detail.textContent = error || 'Aucune transcription YouTube exploitable n’a été trouvée.';
       bar?.classList.add('is-error');
-      updateCaptionsLed('is-missing', 'Sous-titres : absents', error || 'Aucun sous-titre YouTube exploitable trouvé.');
       updatePreviewButton(false);
       return;
     }
 
     if (status === 'failed') {
-      const fullError = error || 'Erreur pendant la récupération des sous-titres YouTube.';
+      const fullError = error || 'Erreur pendant la récupération de la transcription YouTube.';
       badge.textContent = 'Transcription indisponible';
       if (detail) detail.textContent = fullError;
       bar?.classList.add('is-error');
-      updateCaptionsLed('is-error', `Sous-titres : erreur · ${shortErrorLabel(fullError)}`, fullError);
       updatePreviewButton(false);
       return;
     }
 
-    badge.textContent = 'Transcription…';
+    badge.textContent = 'Contexte vidéo…';
     if (detail) detail.textContent = error || '';
-    updateCaptionsLed('is-checking', 'Sous-titres : vérification…');
     updatePreviewButton(false);
   };
 })();

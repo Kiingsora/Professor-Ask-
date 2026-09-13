@@ -17,6 +17,9 @@
     historyLimit: 30,
   };
 
+  const ext = globalThis.browser ?? globalThis.chrome;
+  if (!ext?.runtime || !ext?.storage) throw new Error('WebExtension API unavailable.');
+
   const state = {
     videoId: null,
     transcript: [],
@@ -34,18 +37,15 @@
 
   const api = {
     DEFAULTS,
+    ext,
     state,
     qs(selector, root = document) {
       return root.querySelector(selector);
     },
-    providerRequest(path, { method = 'GET', body } = {}) {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body }, response => {
-          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-          if (!response) return reject(new Error('Aucune réponse du service worker Professor Ask.'));
-          resolve(response);
-        });
-      });
+    async providerRequest(path, { method = 'GET', body } = {}) {
+      const response = await ext.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body });
+      if (!response) throw new Error('Aucune réponse du background Professor Ask.');
+      return response;
     },
     getVideoId() {
       try { return new URL(location.href).searchParams.get('v'); }
@@ -71,7 +71,7 @@
         : state.settings.codexModel || 'auto';
     },
     async loadSettings() {
-      const saved = await chrome.storage.sync.get(DEFAULTS);
+      const saved = await ext.storage.sync.get(DEFAULTS);
       state.settings = { ...DEFAULTS, ...saved };
       api.applyAppearance?.();
       api.renderStatus?.();

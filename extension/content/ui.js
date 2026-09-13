@@ -28,14 +28,13 @@
     }
   };
 
-  PA.openSettings = function openSettings() {
-    chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' }, response => {
-      if (chrome.runtime.lastError) {
-        PA.addMessage('error', `Impossible d'ouvrir les paramètres : ${chrome.runtime.lastError.message}`);
-        return;
-      }
+  PA.openSettings = async function openSettings() {
+    try {
+      const response = await PA.ext.runtime.sendMessage({ type: 'OPEN_OPTIONS' });
       if (response?.ok === false) PA.addMessage('error', response.error || 'Impossible d’ouvrir les paramètres.');
-    });
+    } catch (error) {
+      PA.addMessage('error', `Impossible d'ouvrir les paramètres : ${error.message}`);
+    }
   };
 
   PA.addMessage = function addMessage(role, text, meta = '') {
@@ -87,9 +86,13 @@
         </header>
         <div class="pa-toolbar">
           <span class="pa-pill" id="pa-time">0:00</span>
-          <span class="pa-captions-state" id="pa-captions-state" title="État des sous-titres YouTube">
-            <span class="pa-caption-led is-checking" id="pa-caption-led" aria-hidden="true"></span>
-            <span id="pa-caption-led-text">Sous-titres : vérification…</span>
+          <span class="pa-source-state" id="pa-subtitles-state" title="État des pistes de sous-titres YouTube">
+            <span class="pa-source-icon pa-source-icon-subtitles is-checking" id="pa-subtitles-icon" aria-hidden="true"></span>
+            <span id="pa-subtitles-text">Sous-titres : vérification…</span>
+          </span>
+          <span class="pa-source-state" id="pa-transcription-state" title="État de la transcription horodatée récupérée">
+            <span class="pa-source-icon pa-source-icon-transcript is-checking" id="pa-transcription-icon" aria-hidden="true"></span>
+            <span id="pa-transcription-text">Transcription : vérification…</span>
           </span>
           <span class="pa-pill" id="pa-provider">Codex</span>
           <span class="pa-status" id="pa-status"></span>
@@ -98,7 +101,7 @@
           <div class="pa-transcript-copy">
             <span class="pa-transcript-label">Contexte vidéo</span>
             <strong id="pa-transcript">Recherche transcription…</strong>
-            <span class="pa-transcript-detail" id="pa-transcript-detail">Vérification des sous-titres YouTube.</span>
+            <span class="pa-transcript-detail" id="pa-transcript-detail">Vérification des sous-titres et de la transcription YouTube.</span>
           </div>
           <button class="pa-transcript-preview" id="pa-transcript-preview" type="button" disabled>Voir la transcription</button>
         </div>

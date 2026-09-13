@@ -12,6 +12,14 @@
     return first?.kind === 'asr' ? 'automatic' : 'manual';
   }
 
+  function captionDiagnostics(tracks) {
+    const languages = [...new Set(tracks.map(track => track?.languageCode).filter(Boolean))];
+    return {
+      caption_track_count: tracks.length,
+      caption_languages: languages,
+    };
+  }
+
   async function handleRequest(message) {
     const videoId = String(message.videoId || '');
     if (!videoId) throw new Error('video id missing');
@@ -22,6 +30,7 @@
     }
 
     const tracks = provider.captionTracks(videoId);
+    const captionInfo = captionDiagnostics(tracks);
 
     try {
       const transcript = await provider.fetchTranscript(videoId);
@@ -32,6 +41,7 @@
           segments: transcript.segments,
           tracks,
           diagnostics: {
+            ...captionInfo,
             segment_count: transcript.segments.length,
             first_timestamp: transcript.segments[0].start,
             last_timestamp: last.start + last.duration,
@@ -48,6 +58,7 @@
           errorCode: 'no_captions',
           error: 'Aucun segment de sous-titre YouTube n’a été retourné.',
           tracks,
+          diagnostics: captionInfo,
         };
       }
 
@@ -56,6 +67,7 @@
         errorCode: 'empty_transcript',
         error: 'YouTube expose des sous-titres, mais get_panel n’a retourné aucun segment.',
         tracks,
+        diagnostics: captionInfo,
       };
     } catch (error) {
       return {
@@ -63,6 +75,7 @@
         errorCode: tracks.length ? 'retrieval_failed' : 'unknown',
         error: error?.message || String(error),
         tracks,
+        diagnostics: captionInfo,
       };
     }
   }
@@ -81,6 +94,7 @@
         errorCode: 'bridge_failed',
         error: error?.message || String(error),
         tracks: [],
+        diagnostics: { caption_track_count: 0, caption_languages: [] },
       };
     }
 

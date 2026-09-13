@@ -1,3 +1,5 @@
+export const ext = globalThis.browser ?? globalThis.chrome;
+
 export const DEFAULTS = {
   provider: 'codex',
   codexModel: 'auto',
@@ -24,22 +26,13 @@ export const store = {
 
 export const $ = id => document.getElementById(id);
 
-export function providerRequest(path, { method = 'GET', body } = {}) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body }, response => {
-      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      if (!response) return reject(new Error('Aucune réponse du service worker Professor Ask.'));
-      resolve(response);
-    });
-  });
+export async function providerRequest(path, { method = 'GET', body } = {}) {
+  const response = await ext.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body });
+  if (!response) throw new Error('Aucune réponse du background Professor Ask.');
+  return response;
 }
 
-export function openExternal(url) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: 'OPEN_EXTERNAL', url }, response => {
-      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-      if (!response?.ok) return reject(new Error(response?.error || 'Impossible d’ouvrir le lien.'));
-      resolve();
-    });
-  });
+export async function openExternal(url) {
+  const response = await ext.runtime.sendMessage({ type: 'OPEN_EXTERNAL', url });
+  if (!response?.ok) throw new Error(response?.error || 'Impossible d’ouvrir le lien.');
 }

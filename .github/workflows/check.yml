@@ -14,9 +14,24 @@ jobs:
           node-version: '20'
       - name: Check JavaScript syntax
         run: |
-          find extension native-host -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
-      - name: Validate extension manifest
-        run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
+          find extension native-host scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+      - name: Validate source manifests
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const chrome = JSON.parse(fs.readFileSync('extension/manifest.json', 'utf8'));
+          const firefox = JSON.parse(fs.readFileSync('extension/manifest.firefox.json', 'utf8'));
+          if (chrome.version !== firefox.version) throw new Error('Browser manifest versions differ');
+          if (!chrome.background?.service_worker) throw new Error('Chromium service worker missing');
+          if (!firefox.background?.scripts?.length) throw new Error('Firefox background scripts missing');
+          if ('key' in firefox) throw new Error('Firefox manifest must not contain Chrome key');
+          if (!firefox.browser_specific_settings?.gecko?.id) throw new Error('Firefox Gecko ID missing');
+          NODE
+      - name: Build Chromium and Firefox packages
+        run: node scripts/build-extension.mjs
+      - name: Validate built manifests
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('dist/chromium/manifest.json','utf8')); JSON.parse(require('fs').readFileSync('dist/firefox/manifest.json','utf8'));"
       - name: Smoke test Native Messaging protocol
         run: node native-host/test-native-host.mjs
 

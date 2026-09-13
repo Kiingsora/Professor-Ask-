@@ -12,7 +12,7 @@
     await PA.fetchProviderStatus();
   }
 
-  chrome.storage.onChanged.addListener(async (changes, area) => {
+  PA.ext.storage.onChanged.addListener(async (changes, area) => {
     if (area !== 'sync') return;
 
     const previousTranscriptLanguage = PA.state.settings.transcriptLanguage;
