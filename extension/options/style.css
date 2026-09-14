@@ -63,6 +63,15 @@ h2 { margin: 0; font-size: 18px; }
 .toggle-row span { margin-bottom: 2px; }
 .toggle-row small { color: var(--muted); display: block; max-width: 520px; }
 .toggle-row input { width: 18px; height: 18px; accent-color: #fff; flex: 0 0 auto; }
+.device-code-panel { margin-top: 14px; padding: 13px; border: 1px solid #5b6472; border-radius: 12px; background: #171c24; }
+.device-code-copy { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.device-code-copy span { color: var(--muted); font-size: 12px; }
+.device-code-row { display: flex; gap: 8px; align-items: stretch; }
+.device-code-row code { flex: 1; display: flex; align-items: center; min-height: 42px; padding: 8px 12px; border: 1px solid #3c4553; border-radius: 10px; background: #0d1117; color: #fff; font-size: 18px; font-weight: 800; letter-spacing: .12em; user-select: all; }
+.developer-config { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
+.developer-config summary { cursor: pointer; color: var(--text); font-weight: 650; }
+.developer-config[open] summary { margin-bottom: 10px; }
+.developer-config p { font-size: 12px; }
 .danger-actions { margin-top: 14px; }
 .footer-note { color: var(--muted); display: flex; justify-content: space-between; gap: 16px; padding: 4px 2px; font-size: 12px; }
 code { color: #dce4ef; }
@@ -71,4 +80,5 @@ code { color: #dce4ef; }
   .settings-shell { width: min(100% - 20px, 980px); padding-top: 20px; }
   .hero, .connection-panel, .footer-note { flex-direction: column; }
   .provider-grid, .settings-grid { grid-template-columns: 1fr; }
+  .device-code-row { flex-direction: column; }
 }
