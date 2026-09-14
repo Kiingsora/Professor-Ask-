@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Professor Ask",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "Discuss YouTube videos with Codex or Google Antigravity using timestamped transcript context.",
   "permissions": ["storage", "tabs", "identity"],
   "host_permissions": [
