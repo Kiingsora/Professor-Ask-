@@ -5,6 +5,7 @@ export const DEFAULTS = {
   codexModel: 'auto',
   codexEffort: 'auto',
   antigravityModel: 'auto',
+  antigravityOAuthClientId: '',
   responseLanguage: 'auto',
   responseStyle: 'balanced',
   webSearch: 'auto',
