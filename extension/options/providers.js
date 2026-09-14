@@ -60,14 +60,22 @@ export async function connectProvider(provider) {
     const data = response.data || {};
     if (!response.ok) throw new Error(response.error || data.error || 'Impossible de lancer la connexion.');
 
+    if (provider === 'antigravity') {
+      if (!data.connected) throw new Error(data.error || 'La connexion Google Antigravity n’a pas abouti.');
+      const email = data.account?.email ? ` · ${data.account.email}` : '';
+      setProviderStatus(provider, `Connecté à Antigravity${email}`, '');
+      await loadModels(provider).catch(error => {
+        setProviderStatus(provider, `Connecté · modèles indisponibles : ${error.message}`, 'warn');
+      });
+      return;
+    }
+
     if (data.authUrl && !data.opened) await openExternal(data.authUrl);
 
     setProviderStatus(
       provider,
-      provider === 'codex'
-        ? `Connexion ChatGPT ouverte${data.userCode ? ` · entre le code ${data.userCode}` : ''}`
-        : (data.alreadyConnected ? 'Antigravity est déjà connecté.' : 'Connexion Google ouverte. Termine l’autorisation dans le nouvel onglet.'),
-      data.alreadyConnected ? '' : 'warn',
+      `Connexion ChatGPT ouverte${data.userCode ? ` · entre le code ${data.userCode}` : ''}`,
+      'warn',
     );
 
     if (data.alreadyConnected) {
