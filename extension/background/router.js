@@ -1,7 +1,7 @@
+import { antigravityProvider } from '../providers/antigravity/index.js';
 import { codexProvider } from '../providers/codex/index.js';
-import { nativeRequest } from './native-messaging.js';
 
-const VERSION = '0.9.5';
+const VERSION = '0.9.6';
 
 function parsePath(rawPath) {
   try {
@@ -22,10 +22,20 @@ function validateTranscriptClaim(body) {
   if (!hasText) throw new Error('Le contexte vidéo est marqué disponible mais aucun segment de sous-titre valide n’a été fourni.');
 }
 
-async function directCodex(operation, message) {
-  const handler = codexProvider[operation];
-  if (typeof handler !== 'function') throw new Error(`Action Codex inconnue: ${operation}`);
+function providerFor(name) {
+  if (name === 'codex') return codexProvider;
+  if (name === 'antigravity') return antigravityProvider;
+  throw new Error(`Fournisseur inconnu: ${name}`);
+}
+
+async function directProvider(name, operation, message) {
+  const handler = providerFor(name)[operation];
+  if (typeof handler !== 'function') throw new Error(`Action ${name} inconnue: ${operation}`);
   return handler(message?.body || {});
+}
+
+function transportFor(provider) {
+  return provider === 'antigravity' ? 'direct-antigravity-oauth' : 'direct-codex-oauth';
 }
 
 export async function routeRequest(message) {
@@ -38,34 +48,24 @@ export async function routeRequest(message) {
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
-          antigravity: 'native-companion-optional',
+          antigravity: 'direct-oauth-experimental',
         },
       }, 'browser');
     }
 
-    if (pathname === '/account') return okResponse(await directCodex('status', message), 'direct-codex-oauth');
-    if (pathname === '/login') return okResponse(await directCodex('login', message), 'direct-codex-oauth');
+    if (pathname === '/account') return okResponse(await directProvider('codex', 'status', message), 'direct-codex-oauth');
+    if (pathname === '/login') return okResponse(await directProvider('codex', 'login', message), 'direct-codex-oauth');
 
     const providerRoute = pathname.match(/^\/providers\/(codex|antigravity)\/(status|models|login|logout)$/);
     if (providerRoute) {
       const [, provider, operation] = providerRoute;
-      if (provider === 'codex') return okResponse(await directCodex(operation, message), 'direct-codex-oauth');
-
-      const timeout = operation === 'login' ? 60000 : (operation === 'models' ? 45000 : 30000);
-      const data = await nativeRequest({ action: `provider.${operation}`, provider: 'antigravity' }, timeout);
-      return okResponse(data, 'chrome-native-messaging');
+      return okResponse(await directProvider(provider, operation, message), transportFor(provider));
     }
 
     if (pathname === '/chat') {
       validateTranscriptClaim(message.body);
-
       const provider = message.body?.provider || 'codex';
-      if (provider === 'codex') return okResponse(await directCodex('chat', message), 'direct-codex-oauth');
-      if (provider === 'antigravity') {
-        const data = await nativeRequest({ action: 'chat', payload: message.body || {} }, 210000);
-        return okResponse(data, 'chrome-native-messaging');
-      }
-      throw new Error(`Fournisseur inconnu: ${provider}`);
+      return okResponse(await directProvider(provider, 'chat', message), transportFor(provider));
     }
 
     throw new Error('Route Professor Ask non autorisée.');

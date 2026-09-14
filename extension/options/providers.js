@@ -17,17 +17,17 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
     return false;
   }
 
-  if (provider === 'codex' && data.pending) {
-    const code = data.userCode ? ` · code ${data.userCode}` : '';
-    const error = data.error ? ` · ${data.error}` : '';
-    setProviderStatus(provider, `Connexion ChatGPT en attente${code}${error}`, 'warn');
+  if (data.pending) {
+    if (provider === 'codex') {
+      const code = data.userCode ? ` · code ${data.userCode}` : '';
+      const error = data.error ? ` · ${data.error}` : '';
+      setProviderStatus(provider, `Connexion ChatGPT en attente${code}${error}`, 'warn');
+    } else {
+      setProviderStatus(provider, data.error || 'Connexion Google Antigravity en attente…', 'warn');
+    }
     return false;
   }
 
-  if (!data.installed) {
-    setProviderStatus(provider, provider === 'codex' ? 'Codex indisponible' : 'Antigravity CLI non installé', 'warn');
-    return false;
-  }
   if (!data.connected) {
     setProviderStatus(provider, data.error || 'Non connecté', 'warn');
     return false;
@@ -38,7 +38,8 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
     const plan = data.account?.plan_type || data.account?.planType;
     setProviderStatus(provider, `Connecté${email}${plan ? ` · ${plan}` : ''}`, '');
   } else {
-    setProviderStatus(provider, 'Compte Google Antigravity connecté', '');
+    const email = data.account?.email ? ` · ${data.account.email}` : '';
+    setProviderStatus(provider, `Connecté à Antigravity${email}`, '');
   }
 
   if (withModels) {
@@ -51,7 +52,7 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
 export async function connectProvider(provider) {
   const button = $(`connect-${provider}`);
   button.disabled = true;
-  button.textContent = provider === 'codex' ? 'Ouverture ChatGPT…' : 'Ouverture Antigravity…';
+  button.textContent = provider === 'codex' ? 'Ouverture ChatGPT…' : 'Ouverture Google…';
   setProviderStatus(provider, 'Démarrage de la connexion…', 'warn');
 
   try {
@@ -59,15 +60,20 @@ export async function connectProvider(provider) {
     const data = response.data || {};
     if (!response.ok) throw new Error(response.error || data.error || 'Impossible de lancer la connexion.');
 
-    if (provider === 'codex' && data.authUrl && !data.opened) await openExternal(data.authUrl);
+    if (data.authUrl && !data.opened) await openExternal(data.authUrl);
 
     setProviderStatus(
       provider,
       provider === 'codex'
         ? `Connexion ChatGPT ouverte${data.userCode ? ` · entre le code ${data.userCode}` : ''}`
-        : 'Antigravity ouvert. Termine le Google OAuth dans le navigateur…',
-      'warn',
+        : (data.alreadyConnected ? 'Antigravity est déjà connecté.' : 'Connexion Google ouverte. Termine l’autorisation dans le nouvel onglet.'),
+      data.alreadyConnected ? '' : 'warn',
     );
+
+    if (data.alreadyConnected) {
+      await loadModels(provider).catch(() => {});
+      return;
+    }
 
     for (let i = 0; i < 180; i++) {
       await new Promise(resolve => setTimeout(resolve, 3000));

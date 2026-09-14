@@ -18,7 +18,7 @@
     </header>
 
     <section class="settings-section">
-      <div class="section-heading"><div><h2>Fournisseur IA</h2><p>Codex se connecte directement depuis le navigateur. Antigravity reste séparé tant que Google ne publie pas de flux OAuth tiers équivalent.</p></div></div>
+      <div class="section-heading"><div><h2>Fournisseur IA</h2><p>Codex et Antigravity se connectent directement depuis l’extension, sans application compagnon à lancer.</p></div></div>
       <div class="provider-grid">
         <label class="provider-card" data-provider-card="codex">
           <input type="radio" name="provider" value="codex" />
@@ -27,7 +27,7 @@
         </label>
         <label class="provider-card" data-provider-card="antigravity">
           <input type="radio" name="provider" value="antigravity" />
-          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>Compte Google · client local encore requis</span></div></div>
+          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>OAuth Google direct · expérimental</span></div></div>
           <div class="provider-status muted" id="antigravity-status">Vérification…</div>
         </label>
       </div>
@@ -46,15 +46,14 @@
       </div>
 
       <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
-        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>Google documente actuellement l’authentification du quota Antigravity au travers de son client <code>agy</code>. Professor Ask ne remplace pas ce flux par un OAuth Gemini API, qui utilise un quota différent.</p></div>
+        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>Un clic ouvre Google OAuth. Professor Ask intercepte le retour d’autorisation dans l’extension, conserve les jetons dans son stockage privé et appelle ensuite directement le gateway Antigravity. Aucun CLI ou serveur localhost n’est lancé.</p><small>Cette intégration utilise le flux Antigravity observé dans les clients compatibles actuels ; Google ne le documente pas encore comme contrat OAuth tiers stable.</small></div>
         <div class="connection-actions">
           <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
           <button class="button" id="refresh-antigravity">Actualiser</button>
           <button class="button" id="logout-antigravity">Déconnecter</button>
-          <button class="button" id="open-antigravity-docs">Documentation Antigravity</button>
         </div>
         <div class="settings-grid full-grid provider-model-grid">
-          <label class="field"><span>Modèle Antigravity</span><select id="antigravity-model"><option value="auto">Automatique</option></select><small>La liste vient du compte Antigravity lorsqu’un client local est disponible.</small></label>
+          <label class="field"><span>Modèle Antigravity</span><select id="antigravity-model"><option value="auto">Automatique</option></select><small>La liste est récupérée directement depuis le compte Antigravity connecté.</small></label>
         </div>
       </div>
     </section>
@@ -70,7 +69,7 @@
     </section>
 
     <section class="settings-section">
-      <div class="section-heading"><div><h2>Contexte vidéo</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent. S’ils sont absents, le fallback de transcription doit s’exécuter directement dans l’extension, sans serveur Professor Ask ni programme local à installer.</p></div></div>
+      <div class="section-heading"><div><h2>Contexte vidéo</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent. S’ils sont absents, le fallback local devra s’exécuter directement dans l’extension.</p></div></div>
       <div class="settings-grid">
         <label class="field"><span>Fenêtre de contexte autour du timestamp</span><select id="context-seconds"><option value="60">± 1 minute</option><option value="180">± 3 minutes</option><option value="300">± 5 minutes</option><option value="600">± 10 minutes</option></select></label>
         <label class="field"><span>Langue de transcription préférée</span><select id="transcript-language"><option value="auto">Automatique</option><option value="fr">Français en priorité</option><option value="en">Anglais en priorité</option></select></label>
@@ -95,7 +94,7 @@
       <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
     </section>
 
-    <footer class="footer-note"><span>Codex : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.5</span></footer>
+    <footer class="footer-note"><span>Codex + Antigravity : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.6</span></footer>
   </main>
   <script type="module" src="index.js"></script>
 </body>

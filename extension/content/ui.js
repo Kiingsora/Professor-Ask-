@@ -21,8 +21,6 @@
 
     if (PA.state.connected) {
       status.innerHTML = `<span class="pa-dot ok"></span><span>${PA.providerName()} connecté</span>`;
-    } else if (PA.state.providerStatus?.installed === false) {
-      status.innerHTML = `<span class="pa-dot warn"></span><span>${PA.providerName()} CLI absent</span>`;
     } else {
       status.innerHTML = `<span class="pa-dot warn"></span><span>${PA.providerName()} hors ligne</span>`;
     }
@@ -86,13 +84,13 @@
         </header>
         <div class="pa-toolbar">
           <span class="pa-pill" id="pa-time">0:00</span>
-          <span class="pa-source-state" id="pa-subtitles-state" title="État des pistes de sous-titres YouTube">
-            <span class="pa-source-icon pa-source-icon-subtitles is-checking" id="pa-subtitles-icon" aria-hidden="true"></span>
-            <span id="pa-subtitles-text">Sous-titres : vérification…</span>
+          <span class="pa-source-state" id="pa-subtitles-state" title="Vérification des pistes YouTube">
+            <span class="pa-source-icon pa-source-icon-subtitles is-checking" id="pa-subtitles-icon" role="img" aria-label="État des sous-titres"></span>
+            <span class="pa-source-error" id="pa-subtitles-text" hidden></span>
           </span>
-          <span class="pa-source-state" id="pa-transcription-state" title="État de la transcription horodatée récupérée">
-            <span class="pa-source-icon pa-source-icon-transcript is-checking" id="pa-transcription-icon" aria-hidden="true"></span>
-            <span id="pa-transcription-text">Transcription : vérification…</span>
+          <span class="pa-source-state" id="pa-transcription-state" title="Vérification du contexte horodaté">
+            <span class="pa-source-icon pa-source-icon-transcript is-checking" id="pa-transcription-icon" role="img" aria-label="État de la transcription"></span>
+            <span class="pa-source-error" id="pa-transcription-text" hidden></span>
           </span>
           <span class="pa-pill" id="pa-provider">Codex</span>
           <span class="pa-status" id="pa-status"></span>
@@ -100,10 +98,10 @@
         <div class="pa-transcript-bar" id="pa-transcript-bar">
           <div class="pa-transcript-copy">
             <span class="pa-transcript-label">Contexte vidéo</span>
-            <strong id="pa-transcript">Recherche transcription…</strong>
-            <span class="pa-transcript-detail" id="pa-transcript-detail">Vérification des sous-titres et de la transcription YouTube.</span>
+            <strong id="pa-transcript">Recherche du contexte…</strong>
+            <span class="pa-transcript-detail" id="pa-transcript-detail">Vérification du contexte YouTube.</span>
           </div>
-          <button class="pa-transcript-preview" id="pa-transcript-preview" type="button" disabled>Voir la transcription</button>
+          <button class="pa-transcript-preview" id="pa-transcript-preview" type="button" disabled>Voir le contexte</button>
         </div>
         <div class="pa-messages" id="pa-messages">
           <div class="pa-empty" id="pa-empty">Pose une question sur ce qui vient d'être dit dans la vidéo.</div>

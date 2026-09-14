@@ -1,7 +1,7 @@
 import { CODEX_BASE_URL, SPARK_MODEL_ID } from './config.js';
 import { authorizedFetch } from './client.js';
 import { resolveModel } from './models.js';
-import { buildProfessorPrompt } from './prompt.js';
+import { buildProfessorPrompt } from '../shared/prompt.js';
 import { parseResponse, responseError } from './response.js';
 import { parseCodexSuccess } from './stream.js';
 
