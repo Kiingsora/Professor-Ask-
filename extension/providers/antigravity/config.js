@@ -1,11 +1,8 @@
-// Antigravity uses a public installed-app OAuth client. Keep only the public client id here;
-// PKCE protects the authorization-code exchange and no private client secret is bundled.
-export const ANTIGRAVITY_CLIENT_ID = [
-  '1071006060591',
-  'tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com',
-].join('-');
+// Antigravity authentication is now performed as a public OAuth client from the
+// extension. No client_secret is bundled. The OAuth client id is configured in
+// Professor Ask settings because it must belong to this extension id.
+export const ANTIGRAVITY_CLIENT_ID_SETTING = 'antigravityOAuthClientId';
 
-export const ANTIGRAVITY_REDIRECT_URI = 'http://localhost:51121/oauth-callback';
 export const ANTIGRAVITY_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const ANTIGRAVITY_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 export const ANTIGRAVITY_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
