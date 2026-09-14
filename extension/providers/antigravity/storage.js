@@ -4,6 +4,7 @@ const STORE_NAME = 'kv';
 
 export const AUTH_KEY = 'antigravity-auth-v1';
 export const PENDING_KEY = 'antigravity-pending-v1';
+export const ERROR_KEY = 'antigravity-error-v1';
 
 let dbPromise = null;
 
