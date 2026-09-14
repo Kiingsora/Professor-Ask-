@@ -1,4 +1,4 @@
-import { $, ext, openExternal, store } from './core.js';
+import { $, ext, store } from './core.js';
 import { updateCodexEfforts } from './form.js';
 import { connectProvider, logoutProvider, refreshProvider } from './providers.js';
 import { clearHistory, loadSettings, resetSettings, scheduleSave } from './storage.js';
@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('connect-antigravity').addEventListener('click', () => connectProvider('antigravity'));
   $('refresh-antigravity').addEventListener('click', () => refreshProvider('antigravity'));
   $('logout-antigravity').addEventListener('click', () => logoutProvider('antigravity'));
-  $('open-antigravity-docs').addEventListener('click', () => openExternal('https://antigravity.google/docs/cli/install/'));
   $('clear-history').addEventListener('click', clearHistory);
   $('reset-settings').addEventListener('click', resetSettings);
 });
