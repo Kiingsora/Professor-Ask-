@@ -1,7 +1,6 @@
 import {
   ANTIGRAVITY_AUTH_URL,
-  ANTIGRAVITY_CLIENT_ID,
-  ANTIGRAVITY_REDIRECT_URI,
+  ANTIGRAVITY_CLIENT_ID_SETTING,
   ANTIGRAVITY_REFRESH_SKEW_MS,
   ANTIGRAVITY_REVOKE_URL,
   ANTIGRAVITY_SCOPES,
@@ -10,6 +9,8 @@ import {
 } from './config.js';
 import { createPkce, randomState } from './pkce.js';
 import { AUTH_KEY, ERROR_KEY, PENDING_KEY, secretDelete, secretGet, secretSet } from './storage.js';
+
+const ext = globalThis.browser ?? globalThis.chrome;
 
 function oauthError(data, fallback) {
   return data?.error_description || data?.error?.message || data?.error || fallback;
@@ -28,6 +29,28 @@ async function parseJson(response) {
   catch { return { error_description: text }; }
 }
 
+async function configuredClientId() {
+  const stored = await ext.storage.sync.get({ [ANTIGRAVITY_CLIENT_ID_SETTING]: '' });
+  return String(stored?.[ANTIGRAVITY_CLIENT_ID_SETTING] || '').trim();
+}
+
+function validateClientId(clientId) {
+  if (!clientId) {
+    throw new Error('Client ID OAuth Google manquant. Dans les paramètres Antigravity, configure un client OAuth lié à cette extension.');
+  }
+  if (!clientId.endsWith('.apps.googleusercontent.com')) {
+    throw new Error('Le Client ID OAuth Google configuré n’est pas valide.');
+  }
+  return clientId;
+}
+
+function redirectUri() {
+  if (!ext?.identity?.getRedirectURL || !ext?.identity?.launchWebAuthFlow) {
+    throw new Error('Ce navigateur ne fournit pas l’API WebExtension Identity nécessaire à Antigravity.');
+  }
+  return ext.identity.getRedirectURL('antigravity');
+}
+
 async function fetchUserInfo(accessToken) {
   try {
     const response = await fetch(ANTIGRAVITY_USERINFO_URL, {
@@ -40,15 +63,15 @@ async function fetchUserInfo(accessToken) {
   }
 }
 
-async function exchangeCode(code, verifier) {
+async function exchangeCode(code, verifier, clientId, oauthRedirectUri) {
   const response = await fetch(ANTIGRAVITY_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: new URLSearchParams({
-      client_id: ANTIGRAVITY_CLIENT_ID,
+      client_id: clientId,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+      redirect_uri: oauthRedirectUri,
       code_verifier: verifier,
     }),
   });
@@ -65,6 +88,8 @@ async function exchangeCode(code, verifier) {
     email: user.email || null,
     name: user.name || null,
     projectId: null,
+    clientId,
+    redirectUri: oauthRedirectUri,
     updatedAt: Date.now(),
   };
   await secretSet(AUTH_KEY, auth);
@@ -75,11 +100,12 @@ async function exchangeCode(code, verifier) {
 async function refreshAuth(auth) {
   if (!auth?.refreshToken) throw new Error('Session Antigravity expirée : reconnecte ton compte Google.');
 
+  const clientId = validateClientId(auth.clientId || await configuredClientId());
   const response = await fetch(ANTIGRAVITY_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: new URLSearchParams({
-      client_id: ANTIGRAVITY_CLIENT_ID,
+      client_id: clientId,
       refresh_token: auth.refreshToken,
       grant_type: 'refresh_token',
     }),
@@ -92,6 +118,7 @@ async function refreshAuth(auth) {
 
   const updated = {
     ...auth,
+    clientId,
     accessToken: data.access_token || auth.accessToken,
     refreshToken: data.refresh_token || auth.refreshToken,
     idToken: data.id_token || auth.idToken || null,
@@ -111,48 +138,73 @@ export async function getValidAuth({ forceRefresh = false } = {}) {
   let auth = await secretGet(AUTH_KEY);
   if (!auth?.accessToken) return null;
 
+  const configured = await configuredClientId();
+  if (configured && auth.clientId && configured !== auth.clientId) {
+    await secretDelete(AUTH_KEY);
+    return null;
+  }
+
   if (forceRefresh || !auth.expiresAt || auth.expiresAt <= Date.now() + ANTIGRAVITY_REFRESH_SKEW_MS) {
     auth = await refreshAuth(auth);
   }
   return auth;
 }
 
-export async function login() {
-  const current = await getValidAuth().catch(() => null);
-  if (current) return { started: false, alreadyConnected: true, connected: true, account: { email: current.email } };
-
-  const pending = await secretGet(PENDING_KEY);
-  if (pending?.expiresAt > Date.now()) {
-    return { started: true, opened: false, authUrl: pending.authUrl, expiresIn: Math.floor((pending.expiresAt - Date.now()) / 1000) };
-  }
-
-  await Promise.all([secretDelete(PENDING_KEY), secretDelete(ERROR_KEY)]);
-  const { verifier, challenge } = await createPkce();
-  const state = randomState();
+function buildAuthorizationUrl(clientId, oauthRedirectUri, challenge, state) {
   const url = new URL(ANTIGRAVITY_AUTH_URL);
-  url.searchParams.set('client_id', ANTIGRAVITY_CLIENT_ID);
+  url.searchParams.set('client_id', clientId);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('redirect_uri', ANTIGRAVITY_REDIRECT_URI);
+  url.searchParams.set('redirect_uri', oauthRedirectUri);
   url.searchParams.set('scope', ANTIGRAVITY_SCOPES.join(' '));
   url.searchParams.set('code_challenge', challenge);
   url.searchParams.set('code_challenge_method', 'S256');
   url.searchParams.set('state', state);
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('include_granted_scopes', 'true');
+  return url.toString();
+}
 
-  const authUrl = url.toString();
+export async function login() {
+  const current = await getValidAuth().catch(() => null);
+  if (current) return { started: false, alreadyConnected: true, connected: true, account: { email: current.email } };
+
+  await Promise.all([secretDelete(PENDING_KEY), secretDelete(ERROR_KEY)]);
+
+  const clientId = validateClientId(await configuredClientId());
+  const oauthRedirectUri = redirectUri();
+  const { verifier, challenge } = await createPkce();
+  const state = randomState();
+  const authUrl = buildAuthorizationUrl(clientId, oauthRedirectUri, challenge, state);
+
   await secretSet(PENDING_KEY, {
     state,
     verifier,
+    clientId,
+    redirectUri: oauthRedirectUri,
     authUrl,
     expiresAt: Date.now() + 10 * 60 * 1000,
   });
-  return { started: true, opened: false, authUrl, expiresIn: 600 };
+
+  let finalUrl;
+  try {
+    finalUrl = await ext.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  } catch (error) {
+    await secretDelete(PENDING_KEY);
+    const message = await rememberError(error?.message || String(error));
+    return { started: true, connected: false, error: message };
+  }
+
+  if (!finalUrl) {
+    await secretDelete(PENDING_KEY);
+    const error = await rememberError('Google OAuth n’a renvoyé aucune URL de retour.');
+    return { started: true, connected: false, error };
+  }
+
+  return completeLoginFromUrl(finalUrl);
 }
 
 export async function completeLoginFromUrl(rawUrl) {
-  if (typeof rawUrl !== 'string' || !rawUrl.startsWith(ANTIGRAVITY_REDIRECT_URI)) return { handled: false };
-  const url = new URL(rawUrl);
   const pending = await secretGet(PENDING_KEY);
   if (!pending) {
     const error = await rememberError('Aucune connexion Antigravity en attente.');
@@ -163,7 +215,12 @@ export async function completeLoginFromUrl(rawUrl) {
     const error = await rememberError('La connexion Antigravity a expiré.');
     return { handled: true, connected: false, error };
   }
+  if (typeof rawUrl !== 'string' || !rawUrl.startsWith(pending.redirectUri)) {
+    const error = await rememberError('Retour OAuth Antigravity inattendu.');
+    return { handled: true, connected: false, error };
+  }
 
+  const url = new URL(rawUrl);
   const oauthErrorCode = url.searchParams.get('error');
   if (oauthErrorCode) {
     await secretDelete(PENDING_KEY);
@@ -179,37 +236,64 @@ export async function completeLoginFromUrl(rawUrl) {
   }
 
   try {
-    const auth = await exchangeCode(code, pending.verifier);
-    return { handled: true, connected: true, account: { email: auth.email, name: auth.name } };
+    const auth = await exchangeCode(code, pending.verifier, pending.clientId, pending.redirectUri);
+    return { handled: true, started: true, connected: true, account: { email: auth.email, name: auth.name } };
   } catch (error) {
     await secretDelete(PENDING_KEY);
     const message = await rememberError(error?.message || String(error));
-    return { handled: true, connected: false, error: message };
+    return { handled: true, started: true, connected: false, error: message };
   }
 }
 
 export async function status() {
-  const [pending, lastError] = await Promise.all([secretGet(PENDING_KEY), secretGet(ERROR_KEY)]);
+  const [pending, lastError, clientId] = await Promise.all([
+    secretGet(PENDING_KEY),
+    secretGet(ERROR_KEY),
+    configuredClientId(),
+  ]);
+
+  if (!clientId) {
+    return {
+      installed: true,
+      configured: false,
+      connected: false,
+      pending: false,
+      redirectUri: redirectUri(),
+      error: 'Client ID OAuth Google non configuré.',
+    };
+  }
+
   try {
     const auth = await getValidAuth();
     if (!auth) {
       return {
         installed: true,
+        configured: true,
         connected: false,
         pending: !!(pending?.expiresAt > Date.now()),
+        redirectUri: redirectUri(),
         error: lastError?.message || null,
       };
     }
     return {
       installed: true,
+      configured: true,
       connected: true,
       pending: false,
       account: { email: auth.email, name: auth.name },
       projectId: auth.projectId || null,
-      transport: 'direct-antigravity-oauth',
+      redirectUri: auth.redirectUri || redirectUri(),
+      transport: 'extension-identity-pkce',
     };
   } catch (error) {
-    return { installed: true, connected: false, pending: false, error: error?.message || String(error) };
+    return {
+      installed: true,
+      configured: true,
+      connected: false,
+      pending: false,
+      redirectUri: redirectUri(),
+      error: error?.message || String(error),
+    };
   }
 }
 
