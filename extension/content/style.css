@@ -44,7 +44,11 @@
 .pa-settings:hover { background: var(--pa-surface-2); }
 .pa-toolbar { padding: 9px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--pa-line); }
 .pa-pill { background: var(--pa-surface-2); border: 1px solid var(--pa-line-strong); color: var(--pa-text); border-radius: 999px; padding: 5px 9px; font-size: 12px; }
-.pa-source-state { display: inline-flex; align-items: center; gap: 6px; min-height: 27px; padding: 5px 9px; border: 1px solid var(--pa-line-strong); border-radius: 999px; background: var(--pa-surface-2); color: var(--pa-text); font-size: 12px; font-weight: 600; }
+.pa-source-state { width: 29px; min-height: 27px; padding: 5px 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--pa-line-strong); border-radius: 999px; background: var(--pa-surface-2); color: var(--pa-text); font-size: 11px; font-weight: 600; }
+.pa-source-state.has-error { width: auto; max-width: 100%; justify-content: flex-start; padding: 5px 9px; }
+.pa-source-error[hidden] { display: none !important; }
+.pa-source-error { color: #ffb4b4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px; }
+.pa-theme-light .pa-source-error { color: #8c2020; }
 .pa-source-icon { position: relative; width: 15px; height: 12px; flex: 0 0 auto; border: 1.5px solid currentColor; border-radius: 2px; color: #777; }
 .pa-source-icon-subtitles::after { content: ''; position: absolute; left: 2px; right: 2px; bottom: 2px; height: 1.5px; border-radius: 999px; background: currentColor; }
 .pa-source-icon-transcript { background: linear-gradient(currentColor,currentColor) 2px 2px / 9px 1.5px no-repeat, linear-gradient(currentColor,currentColor) 2px 5px / 9px 1.5px no-repeat, linear-gradient(currentColor,currentColor) 2px 8px / 7px 1.5px no-repeat; }
