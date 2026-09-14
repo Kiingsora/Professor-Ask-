@@ -1,6 +1,16 @@
 import { $, openExternal, providerRequest } from './core.js';
 import { populateModels, setProviderStatus } from './form.js';
 
+function setCodexDeviceCode(userCode = '') {
+  const panel = $('codex-device-code-panel');
+  const code = $('codex-user-code');
+  if (!panel || !code) return;
+
+  const value = String(userCode || '').trim();
+  code.textContent = value;
+  panel.hidden = !value;
+}
+
 export async function loadModels(provider) {
   const response = await providerRequest(`/providers/${provider}/models`);
   if (!response.ok) throw new Error(response.error || response.data?.error || 'Impossible de charger les modèles.');
@@ -13,15 +23,16 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
   const data = response?.data || {};
 
   if (!response?.ok) {
+    if (provider === 'codex') setCodexDeviceCode('');
     setProviderStatus(provider, response?.error || 'Fournisseur indisponible', 'warn');
     return false;
   }
 
   if (data.pending) {
     if (provider === 'codex') {
-      const code = data.userCode ? ` · code ${data.userCode}` : '';
+      setCodexDeviceCode(data.userCode || '');
       const error = data.error ? ` · ${data.error}` : '';
-      setProviderStatus(provider, `Connexion ChatGPT en attente${code}${error}`, 'warn');
+      setProviderStatus(provider, `Connexion ChatGPT en attente${error}`, 'warn');
     } else {
       setProviderStatus(provider, data.error || 'Connexion Google Antigravity en attente…', 'warn');
     }
@@ -29,11 +40,13 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
   }
 
   if (!data.connected) {
+    if (provider === 'codex') setCodexDeviceCode('');
     setProviderStatus(provider, data.error || 'Non connecté', 'warn');
     return false;
   }
 
   if (provider === 'codex') {
+    setCodexDeviceCode('');
     const email = data.account?.email ? ` · ${data.account.email}` : '';
     const plan = data.account?.plan_type || data.account?.planType;
     setProviderStatus(provider, `Connecté${email}${plan ? ` · ${plan}` : ''}`, '');
@@ -70,15 +83,19 @@ export async function connectProvider(provider) {
       return;
     }
 
+    setCodexDeviceCode(data.userCode || '');
     if (data.authUrl && !data.opened) await openExternal(data.authUrl);
 
     setProviderStatus(
       provider,
-      `Connexion ChatGPT ouverte${data.userCode ? ` · entre le code ${data.userCode}` : ''}`,
+      data.userCode
+        ? 'Connexion ChatGPT ouverte · copie le code affiché ci-dessous puis colle-le sur la page OpenAI.'
+        : 'Connexion ChatGPT ouverte.',
       'warn',
     );
 
     if (data.alreadyConnected) {
+      setCodexDeviceCode('');
       await loadModels(provider).catch(() => {});
       return;
     }
@@ -92,6 +109,7 @@ export async function connectProvider(provider) {
       }
     }
   } catch (error) {
+    if (provider === 'codex') setCodexDeviceCode('');
     setProviderStatus(provider, error.message, 'warn');
   } finally {
     button.disabled = false;
@@ -105,6 +123,7 @@ export async function logoutProvider(provider) {
     setProviderStatus(provider, response.error || response.data?.error || 'Déconnexion impossible.', 'warn');
     return;
   }
+  if (provider === 'codex') setCodexDeviceCode('');
   populateModels(provider, []);
   setProviderStatus(provider, 'Déconnecté', 'warn');
 }
