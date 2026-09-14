@@ -3,6 +3,23 @@ import { updateCodexEfforts } from './form.js';
 import { connectProvider, logoutProvider, refreshProvider } from './providers.js';
 import { clearHistory, loadSettings, resetSettings, scheduleSave } from './storage.js';
 
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const footerVersion = document.querySelector('.footer-note span:last-child');
   if (footerVersion) footerVersion.textContent = `Professor Ask v${ext.runtime.getManifest().version}`;
@@ -38,6 +55,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('connect-codex').addEventListener('click', () => connectProvider('codex'));
   $('refresh-codex').addEventListener('click', () => refreshProvider('codex'));
   $('logout-codex').addEventListener('click', () => logoutProvider('codex'));
+  $('copy-codex-code').addEventListener('click', async () => {
+    const code = $('codex-user-code')?.textContent?.trim();
+    if (!code) return;
+
+    const button = $('copy-codex-code');
+    const original = button.textContent;
+    try {
+      await copyText(code);
+      button.textContent = 'Copié';
+    } catch {
+      button.textContent = 'Copie impossible';
+    }
+    setTimeout(() => { button.textContent = original; }, 1400);
+  });
+
   $('connect-antigravity').addEventListener('click', () => connectProvider('antigravity'));
   $('refresh-antigravity').addEventListener('click', () => refreshProvider('antigravity'));
   $('logout-antigravity').addEventListener('click', () => logoutProvider('antigravity'));
