@@ -9,10 +9,16 @@ import {
   ANTIGRAVITY_USERINFO_URL,
 } from './config.js';
 import { createPkce, randomState } from './pkce.js';
-import { AUTH_KEY, PENDING_KEY, secretDelete, secretGet, secretSet } from './storage.js';
+import { AUTH_KEY, ERROR_KEY, PENDING_KEY, secretDelete, secretGet, secretSet } from './storage.js';
 
 function oauthError(data, fallback) {
   return data?.error_description || data?.error?.message || data?.error || fallback;
+}
+
+async function rememberError(message) {
+  const text = String(message || 'Erreur OAuth Antigravity.');
+  await secretSet(ERROR_KEY, { message: text, at: Date.now() });
+  return text;
 }
 
 async function parseJson(response) {
@@ -62,7 +68,7 @@ async function exchangeCode(code, verifier) {
     updatedAt: Date.now(),
   };
   await secretSet(AUTH_KEY, auth);
-  await secretDelete(PENDING_KEY);
+  await Promise.all([secretDelete(PENDING_KEY), secretDelete(ERROR_KEY)]);
   return auth;
 }
 
@@ -120,6 +126,7 @@ export async function login() {
     return { started: true, opened: false, authUrl: pending.authUrl, expiresIn: Math.floor((pending.expiresAt - Date.now()) / 1000) };
   }
 
+  await Promise.all([secretDelete(PENDING_KEY), secretDelete(ERROR_KEY)]);
   const { verifier, challenge } = await createPkce();
   const state = randomState();
   const url = new URL(ANTIGRAVITY_AUTH_URL);
@@ -147,22 +154,28 @@ export async function completeLoginFromUrl(rawUrl) {
   if (typeof rawUrl !== 'string' || !rawUrl.startsWith(ANTIGRAVITY_REDIRECT_URI)) return { handled: false };
   const url = new URL(rawUrl);
   const pending = await secretGet(PENDING_KEY);
-  if (!pending) return { handled: true, connected: false, error: 'Aucune connexion Antigravity en attente.' };
+  if (!pending) {
+    const error = await rememberError('Aucune connexion Antigravity en attente.');
+    return { handled: true, connected: false, error };
+  }
   if (pending.expiresAt <= Date.now()) {
     await secretDelete(PENDING_KEY);
-    return { handled: true, connected: false, error: 'La connexion Antigravity a expiré.' };
+    const error = await rememberError('La connexion Antigravity a expiré.');
+    return { handled: true, connected: false, error };
   }
 
   const oauthErrorCode = url.searchParams.get('error');
   if (oauthErrorCode) {
     await secretDelete(PENDING_KEY);
-    return { handled: true, connected: false, error: url.searchParams.get('error_description') || oauthErrorCode };
+    const error = await rememberError(url.searchParams.get('error_description') || oauthErrorCode);
+    return { handled: true, connected: false, error };
   }
 
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   if (!code || !state || state !== pending.state) {
-    return { handled: true, connected: false, error: 'Retour OAuth Antigravity invalide.' };
+    const error = await rememberError('Retour OAuth Antigravity invalide.');
+    return { handled: true, connected: false, error };
   }
 
   try {
@@ -170,12 +183,13 @@ export async function completeLoginFromUrl(rawUrl) {
     return { handled: true, connected: true, account: { email: auth.email, name: auth.name } };
   } catch (error) {
     await secretDelete(PENDING_KEY);
-    return { handled: true, connected: false, error: error?.message || String(error) };
+    const message = await rememberError(error?.message || String(error));
+    return { handled: true, connected: false, error: message };
   }
 }
 
 export async function status() {
-  const pending = await secretGet(PENDING_KEY);
+  const [pending, lastError] = await Promise.all([secretGet(PENDING_KEY), secretGet(ERROR_KEY)]);
   try {
     const auth = await getValidAuth();
     if (!auth) {
@@ -183,6 +197,7 @@ export async function status() {
         installed: true,
         connected: false,
         pending: !!(pending?.expiresAt > Date.now()),
+        error: lastError?.message || null,
       };
     }
     return {
@@ -200,7 +215,7 @@ export async function status() {
 
 export async function logout() {
   const auth = await secretGet(AUTH_KEY);
-  await Promise.all([secretDelete(AUTH_KEY), secretDelete(PENDING_KEY)]);
+  await Promise.all([secretDelete(AUTH_KEY), secretDelete(PENDING_KEY), secretDelete(ERROR_KEY)]);
   if (auth?.refreshToken) {
     fetch(ANTIGRAVITY_REVOKE_URL, {
       method: 'POST',
