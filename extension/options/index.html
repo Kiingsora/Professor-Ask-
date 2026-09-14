@@ -27,18 +27,30 @@
         </label>
         <label class="provider-card" data-provider-card="antigravity">
           <input type="radio" name="provider" value="antigravity" />
-          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>OAuth Google public + PKCE · aucune installation</span></div></div>
+          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>Connexion Google · aucune installation</span></div></div>
           <div class="provider-status muted" id="antigravity-status">Vérification…</div>
         </label>
       </div>
 
       <div class="connection-panel connection-stack" id="codex-panel">
-        <div class="connection-copy"><strong>Compte ChatGPT / Codex</strong><p>Un clic ouvre l’autorisation OpenAI dans un nouvel onglet. Professor Ask utilise ensuite directement la session OAuth Codex liée à ton forfait ChatGPT, sans CLI, bridge, port local ni terminal.</p></div>
+        <div class="connection-copy"><strong>Compte ChatGPT / Codex</strong><p>Un clic ouvre la page de connexion OpenAI. Professor Ask utilise ensuite directement la session OAuth Codex liée à ton forfait ChatGPT.</p></div>
         <div class="connection-actions">
           <button class="button primary" id="connect-codex">Se connecter avec ChatGPT</button>
           <button class="button" id="refresh-codex">Actualiser</button>
           <button class="button" id="logout-codex">Déconnecter</button>
         </div>
+
+        <div class="device-code-panel" id="codex-device-code-panel" hidden>
+          <div class="device-code-copy">
+            <strong>Code à donner à ChatGPT</strong>
+            <span>La page OpenAI va te demander ce code.</span>
+          </div>
+          <div class="device-code-row">
+            <code id="codex-user-code"></code>
+            <button class="button" id="copy-codex-code" type="button">Copier le code</button>
+          </div>
+        </div>
+
         <div class="settings-grid full-grid provider-model-grid">
           <label class="field"><span>Modèle Codex</span><select id="codex-model"><option value="auto">Automatique</option></select><small>Le catalogue est récupéré directement depuis le compte Codex connecté.</small></label>
           <label class="field"><span>Effort de raisonnement</span><select id="codex-effort"><option value="auto">Automatique</option></select><small>Les niveaux affichés dépendent du modèle sélectionné.</small></label>
@@ -46,21 +58,24 @@
       </div>
 
       <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
-        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>Professor Ask utilise maintenant un client OAuth public propre à l’extension, avec PKCE. Aucun <code>client_secret</code>, CLI, serveur localhost ou programme compagnon n’est nécessaire.</p><small>Le gateway Antigravity reste une API Google non documentée comme contrat tiers stable. L’authentification, elle, passe par l’API Identity du navigateur.</small></div>
-
-        <div class="provider-config-block">
-          <div class="settings-grid full-grid">
-            <label class="field"><span>Client ID OAuth Google</span><input type="text" id="antigravity-oauth-client-id" autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com" /><small>Client OAuth de type <strong>Extension Chrome</strong> associé à Professor Ask. Un Client ID n’est pas un secret et peut être distribué avec l’extension.</small></label>
-            <div class="field"><span>ID de l’extension</span><code id="antigravity-extension-id">Chargement…</code><small>Utilise cet ID comme <strong>Item ID</strong> lors de la création du client OAuth Google.</small></div>
-          </div>
-          <p class="provider-help">URI de retour utilisé par l’extension : <code id="antigravity-redirect-uri">Chargement…</code></p>
-        </div>
+        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>L’expérience cible est la même que pour ChatGPT : clique sur « Se connecter avec Google », connecte ton compte sur la page Google, puis reviens à Professor Ask. Aucun secret, CLI ou serveur local n’est demandé à l’utilisateur.</p><small>Le client OAuth public de Professor Ask doit être enregistré une seule fois par l’éditeur de l’extension auprès de Google.</small></div>
 
         <div class="connection-actions">
           <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
           <button class="button" id="refresh-antigravity">Actualiser</button>
           <button class="button" id="logout-antigravity">Déconnecter</button>
         </div>
+
+        <details class="developer-config" id="antigravity-developer-config">
+          <summary>Configuration développeur Antigravity</summary>
+          <p>Cette configuration est faite une seule fois pour la build Professor Ask. Les utilisateurs finaux n’ont pas à saisir de Client ID.</p>
+          <div class="settings-grid full-grid">
+            <label class="field"><span>Client ID OAuth Google de Professor Ask</span><input type="text" id="antigravity-oauth-client-id" autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com" /><small>Client OAuth de type <strong>Extension Chrome</strong> associé à l’ID stable de Professor Ask.</small></label>
+            <div class="field"><span>ID de l’extension</span><code id="antigravity-extension-id">Chargement…</code><small>Item ID à enregistrer une seule fois dans Google Cloud.</small></div>
+          </div>
+          <p class="provider-help">URI de retour : <code id="antigravity-redirect-uri">Chargement…</code></p>
+        </details>
+
         <div class="settings-grid full-grid provider-model-grid">
           <label class="field"><span>Modèle Antigravity</span><select id="antigravity-model"><option value="auto">Automatique</option></select><small>La liste est récupérée directement depuis le compte Antigravity connecté.</small></label>
         </div>
@@ -103,7 +118,7 @@
       <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
     </section>
 
-    <footer class="footer-note"><span>Codex + Antigravity : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.7</span></footer>
+    <footer class="footer-note"><span>Codex + Antigravity : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.8</span></footer>
   </main>
   <script type="module" src="index.js"></script>
 </body>
