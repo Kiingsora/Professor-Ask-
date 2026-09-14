@@ -27,7 +27,7 @@
         </label>
         <label class="provider-card" data-provider-card="antigravity">
           <input type="radio" name="provider" value="antigravity" />
-          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>OAuth Google direct · expérimental</span></div></div>
+          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>OAuth Google public + PKCE · aucune installation</span></div></div>
           <div class="provider-status muted" id="antigravity-status">Vérification…</div>
         </label>
       </div>
@@ -46,7 +46,16 @@
       </div>
 
       <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
-        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>Un clic ouvre Google OAuth. Professor Ask intercepte le retour d’autorisation dans l’extension, conserve les jetons dans son stockage privé et appelle ensuite directement le gateway Antigravity. Aucun CLI ou serveur localhost n’est lancé.</p><small>Cette intégration utilise le flux Antigravity observé dans les clients compatibles actuels ; Google ne le documente pas encore comme contrat OAuth tiers stable.</small></div>
+        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>Professor Ask utilise maintenant un client OAuth public propre à l’extension, avec PKCE. Aucun <code>client_secret</code>, CLI, serveur localhost ou programme compagnon n’est nécessaire.</p><small>Le gateway Antigravity reste une API Google non documentée comme contrat tiers stable. L’authentification, elle, passe par l’API Identity du navigateur.</small></div>
+
+        <div class="provider-config-block">
+          <div class="settings-grid full-grid">
+            <label class="field"><span>Client ID OAuth Google</span><input type="text" id="antigravity-oauth-client-id" autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com" /><small>Client OAuth de type <strong>Extension Chrome</strong> associé à Professor Ask. Un Client ID n’est pas un secret et peut être distribué avec l’extension.</small></label>
+            <div class="field"><span>ID de l’extension</span><code id="antigravity-extension-id">Chargement…</code><small>Utilise cet ID comme <strong>Item ID</strong> lors de la création du client OAuth Google.</small></div>
+          </div>
+          <p class="provider-help">URI de retour utilisé par l’extension : <code id="antigravity-redirect-uri">Chargement…</code></p>
+        </div>
+
         <div class="connection-actions">
           <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
           <button class="button" id="refresh-antigravity">Actualiser</button>
@@ -94,7 +103,7 @@
       <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
     </section>
 
-    <footer class="footer-note"><span>Codex + Antigravity : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.6</span></footer>
+    <footer class="footer-note"><span>Codex + Antigravity : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.7</span></footer>
   </main>
   <script type="module" src="index.js"></script>
 </body>
