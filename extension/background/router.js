@@ -1,7 +1,7 @@
 import { antigravityProvider } from '../providers/antigravity/index.js';
 import { codexProvider } from '../providers/codex/index.js';
 
-const VERSION = '0.9.7';
+const VERSION = '0.9.8';
 
 function parsePath(rawPath) {
   try {
