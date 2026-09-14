@@ -27,6 +27,7 @@ export function readForm() {
     codexModel: $('codex-model').value || 'auto',
     codexEffort: $('codex-effort').value || 'auto',
     antigravityModel: $('antigravity-model').value || 'auto',
+    antigravityOAuthClientId: $('antigravity-oauth-client-id')?.value.trim() || '',
     responseLanguage: $('response-language').value,
     responseStyle: $('response-style').value,
     webSearch: $('web-search').value,
@@ -46,6 +47,8 @@ export function writeForm(value) {
   const providerInput = document.querySelector(`input[name="provider"][value="${store.settings.provider}"]`);
   if (providerInput) providerInput.checked = true;
 
+  const antigravityClient = $('antigravity-oauth-client-id');
+  if (antigravityClient) antigravityClient.value = store.settings.antigravityOAuthClientId || '';
   $('response-language').value = store.settings.responseLanguage;
   $('response-style').value = store.settings.responseStyle;
   $('web-search').value = store.settings.webSearch;
