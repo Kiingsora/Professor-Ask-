@@ -1,7 +1,7 @@
 import { antigravityProvider } from '../providers/antigravity/index.js';
 import { codexProvider } from '../providers/codex/index.js';
 
-const VERSION = '0.9.6';
+const VERSION = '0.9.7';
 
 function parsePath(rawPath) {
   try {
@@ -35,7 +35,7 @@ async function directProvider(name, operation, message) {
 }
 
 function transportFor(provider) {
-  return provider === 'antigravity' ? 'direct-antigravity-oauth' : 'direct-codex-oauth';
+  return provider === 'antigravity' ? 'extension-identity-pkce' : 'direct-codex-oauth';
 }
 
 export async function routeRequest(message) {
@@ -48,7 +48,7 @@ export async function routeRequest(message) {
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
-          antigravity: 'direct-oauth-experimental',
+          antigravity: 'extension-identity-pkce-experimental',
         },
       }, 'browser');
     }
