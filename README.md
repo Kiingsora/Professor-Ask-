@@ -23,10 +23,11 @@ The previous `transcription-service/` HTTP fallback has been removed. A browser-
 extension/
 ├─ background/
 │  ├─ index.js
-│  ├─ router.js
-│  └─ native-messaging.js       # optional Antigravity only
+│  └─ router.js
 ├─ providers/
-│  └─ codex/                    # direct browser OAuth + Codex transport
+│  ├─ codex/                    # direct browser OAuth + Codex transport
+│  ├─ antigravity/              # public OAuth + PKCE + direct gateway transport
+│  └─ shared/
 ├─ content/
 │  ├─ core.js
 │  ├─ app.js
@@ -47,8 +48,6 @@ extension/
 
 scripts/
 └─ build-extension.mjs          # builds both browser packages
-
-native-host/                     # optional Antigravity provider only
 ```
 
 ## Context indicators
@@ -58,7 +57,7 @@ Professor Ask reports two independent states in the YouTube panel:
 - **Subtitles icon**: a square with one line at the bottom. It means YouTube exposes one or more caption tracks.
 - **Transcript icon**: a square with multiple lines. It means timestamped transcript segments were actually retrieved and can be sent as video context.
 
-This distinction makes failures explicit: captions can be detected while transcript retrieval fails.
+The labels stay hidden during normal operation. Error text appears next to the relevant icon only when retrieval fails.
 
 ## Providers
 
@@ -68,13 +67,26 @@ Codex is browser-only. The extension performs OpenAI device OAuth, stores the se
 
 ### Google Antigravity
 
-Antigravity is isolated as an optional provider because its current account flow still uses the local `agy` client. It is not part of the core Codex/transcription path.
+Antigravity uses the WebExtension Identity API with Authorization Code + PKCE. No `client_secret`, localhost listener, CLI or companion process is bundled.
+
+For development, Professor Ask needs a Google OAuth client that belongs to the extension:
+
+1. In Google Cloud, create an OAuth client of type **Chrome Extension**.
+2. Use the Professor Ask extension ID shown in **Settings -> Antigravity** as the Google **Item ID**.
+3. Copy the resulting `...apps.googleusercontent.com` client ID into the Antigravity settings field.
+4. Click **Se connecter avec Google**.
+
+The client ID is public application metadata, not a credential secret. PKCE and the browser-generated redirect bind each authorization code to the extension instance that initiated the flow.
+
+The Antigravity gateway endpoints themselves are not documented by Google as a stable third-party API contract, so this provider remains experimental even though the OAuth flow uses standard browser primitives.
+
+Firefox uses a different extension identity/redirect origin. The core extension remains Firefox-compatible, but Antigravity OAuth must be validated with a Google client configuration that accepts the Firefox identity redirect before the provider can be considered supported there.
 
 ## Storage
 
-- WebExtension sync storage: non-secret preferences.
+- WebExtension sync storage: non-secret preferences and the public Google OAuth client ID.
 - WebExtension local storage: per-video conversation history.
-- extension-private IndexedDB: Codex OAuth credentials.
+- extension-private IndexedDB: provider OAuth credentials.
 
 ## Build Chrome / Edge / Firefox
 
