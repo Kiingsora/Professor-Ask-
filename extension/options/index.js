@@ -1,5 +1,5 @@
 import { $, ext, store } from './core.js';
-import { updateCodexEfforts } from './form.js';
+import { populateModels, updateCodexEfforts } from './form.js';
 import { connectProvider, logoutProvider, refreshProvider } from './providers.js';
 import { clearHistory, loadSettings, resetSettings, scheduleSave } from './storage.js';
 
@@ -24,30 +24,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const footerVersion = document.querySelector('.footer-note span:last-child');
   if (footerVersion) footerVersion.textContent = `Professor Ask v${ext.runtime.getManifest().version}`;
 
-  const extensionId = $('antigravity-extension-id');
-  if (extensionId) extensionId.textContent = ext.runtime.id || '(indisponible)';
-
-  const redirect = $('antigravity-redirect-uri');
-  if (redirect) {
-    try {
-      redirect.textContent = ext.identity?.getRedirectURL?.('antigravity') || '(API Identity indisponible)';
-    } catch {
-      redirect.textContent = '(API Identity indisponible)';
-    }
-  }
-
   await loadSettings();
   await Promise.all([
     refreshProvider('codex').catch(() => false),
-    refreshProvider('antigravity').catch(() => false),
+    refreshProvider('api').catch(() => false),
   ]);
 
-  document.querySelectorAll('select, input[type="text"], input[type="checkbox"], input[name="provider"]').forEach(control => {
+  document.querySelectorAll('select, input[type="checkbox"], input[name="provider"]').forEach(control => {
     control.addEventListener('change', () => {
       if (control.id === 'codex-model') {
         store.settings.codexModel = control.value;
         updateCodexEfforts();
       }
+      if (control.id === 'api-provider') {
+        store.settings.apiProvider = control.value;
+        store.settings.apiModel = 'auto';
+        populateModels('api', []);
+        scheduleSave();
+        refreshProvider('api').catch(() => false);
+        return;
+      }
+      if (control.id === 'api-model') store.settings.apiModel = control.value;
       scheduleSave();
     });
   });
@@ -70,9 +67,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => { button.textContent = original; }, 1400);
   });
 
-  $('connect-antigravity').addEventListener('click', () => connectProvider('antigravity'));
-  $('refresh-antigravity').addEventListener('click', () => refreshProvider('antigravity'));
-  $('logout-antigravity').addEventListener('click', () => logoutProvider('antigravity'));
+  $('connect-api').addEventListener('click', () => connectProvider('api'));
+  $('refresh-api').addEventListener('click', () => refreshProvider('api'));
+  $('logout-api').addEventListener('click', () => logoutProvider('api'));
   $('clear-history').addEventListener('click', clearHistory);
   $('reset-settings').addEventListener('click', resetSettings);
 });

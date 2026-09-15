@@ -3,8 +3,11 @@
 
   PA.fetchProviderStatus = async function fetchProviderStatus() {
     try {
-      const provider = PA.state.settings.provider === 'antigravity' ? 'antigravity' : 'codex';
-      const response = await PA.providerRequest(`/providers/${provider}/status`);
+      const provider = PA.state.settings.provider === 'api' ? 'api' : 'codex';
+      const options = provider === 'api'
+        ? { body: { apiProvider: PA.state.settings.apiProvider } }
+        : undefined;
+      const response = await PA.providerRequest(`/providers/${provider}/status`, options);
       const data = response.data || {};
       PA.state.connected = !!(response.ok && data.connected);
       PA.state.providerStatus = data;
@@ -24,7 +27,10 @@
     if (!question) return;
 
     if (!PA.state.connected) {
-      PA.addMessage('error', `${PA.providerName()} n’est pas connecté. Ouvre les paramètres pour lancer la connexion OAuth.`);
+      const action = PA.state.settings.provider === 'api'
+        ? 'Ouvre les paramètres pour enregistrer la clé API correspondante.'
+        : 'Ouvre les paramètres pour lancer la connexion OAuth.';
+      PA.addMessage('error', `${PA.providerName()} n’est pas connecté. ${action}`);
       return;
     }
 
@@ -43,7 +49,7 @@
     const model = PA.selectedModelName();
     const sourceLabel = hasVideoContext
       ? (PA.state.transcriptSource === 'generated' ? 'transcription IA' : 'sous-titres YouTube')
-      : 'web uniquement · aucun contexte vidéo';
+      : 'aucun contexte vidéo';
     const placeholder = PA.addMessage(
       'assistant',
       'Réflexion…',
@@ -76,7 +82,8 @@
             webSearch: PA.state.settings.webSearch,
             codexModel: PA.state.settings.codexModel,
             codexEffort: PA.state.settings.codexEffort,
-            antigravityModel: PA.state.settings.antigravityModel,
+            apiProvider: PA.state.settings.apiProvider,
+            apiModel: PA.state.settings.apiModel,
           },
         },
       });

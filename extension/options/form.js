@@ -8,6 +8,7 @@ export function setSaveState(text, kind = '') {
 
 export function setProviderStatus(provider, text, kind = 'muted') {
   const element = $(`${provider}-status`);
+  if (!element) return;
   element.textContent = text;
   element.className = `provider-status ${kind}`.trim();
 }
@@ -15,7 +16,7 @@ export function setProviderStatus(provider, text, kind = 'muted') {
 export function setProviderPanels() {
   const provider = store.settings.provider || 'codex';
   $('codex-panel').hidden = provider !== 'codex';
-  $('antigravity-panel').hidden = provider !== 'antigravity';
+  $('api-panel').hidden = provider !== 'api';
   document.querySelectorAll('[data-provider-card]').forEach(card => {
     card.classList.toggle('selected', card.dataset.providerCard === provider);
   });
@@ -26,8 +27,8 @@ export function readForm() {
     provider: document.querySelector('input[name="provider"]:checked')?.value || 'codex',
     codexModel: $('codex-model').value || 'auto',
     codexEffort: $('codex-effort').value || 'auto',
-    antigravityModel: $('antigravity-model').value || 'auto',
-    antigravityOAuthClientId: $('antigravity-oauth-client-id')?.value.trim() || '',
+    apiProvider: $('api-provider').value || 'gemini',
+    apiModel: $('api-model').value || 'auto',
     responseLanguage: $('response-language').value,
     responseStyle: $('response-style').value,
     webSearch: $('web-search').value,
@@ -43,12 +44,14 @@ export function readForm() {
 }
 
 export function writeForm(value) {
-  store.settings = { ...DEFAULTS, ...value };
+  const migrated = { ...value };
+  if (migrated.provider === 'antigravity') migrated.provider = 'api';
+  store.settings = { ...DEFAULTS, ...migrated };
+
   const providerInput = document.querySelector(`input[name="provider"][value="${store.settings.provider}"]`);
   if (providerInput) providerInput.checked = true;
 
-  const antigravityClient = $('antigravity-oauth-client-id');
-  if (antigravityClient) antigravityClient.value = store.settings.antigravityOAuthClientId || '';
+  $('api-provider').value = store.settings.apiProvider;
   $('response-language').value = store.settings.responseLanguage;
   $('response-style').value = store.settings.responseStyle;
   $('web-search').value = store.settings.webSearch;
@@ -82,8 +85,8 @@ export function updateCodexEfforts() {
 
 export function populateModels(provider, models) {
   store.modelCatalogs[provider] = Array.isArray(models) ? models : [];
-  const select = $(provider === 'codex' ? 'codex-model' : 'antigravity-model');
-  const savedValue = provider === 'codex' ? store.settings.codexModel : store.settings.antigravityModel;
+  const select = $(provider === 'codex' ? 'codex-model' : 'api-model');
+  const savedValue = provider === 'codex' ? store.settings.codexModel : store.settings.apiModel;
   select.innerHTML = '<option value="auto">Automatique</option>';
 
   for (const model of store.modelCatalogs[provider]) {

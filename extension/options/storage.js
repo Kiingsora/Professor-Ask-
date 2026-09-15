@@ -34,7 +34,7 @@ export async function resetSettings() {
   store.settings = { ...DEFAULTS };
   writeForm(store.settings);
   populateModels('codex', store.modelCatalogs.codex);
-  populateModels('antigravity', store.modelCatalogs.antigravity);
+  populateModels('api', []);
   await ext.storage.sync.set(store.settings);
   setSaveState('Paramètres réinitialisés', 'ok');
 }

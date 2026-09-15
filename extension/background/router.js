@@ -1,7 +1,7 @@
-import { antigravityProvider } from '../providers/antigravity/index.js';
+import { apiKeyProvider } from '../providers/api/index.js';
 import { codexProvider } from '../providers/codex/index.js';
 
-const VERSION = '0.9.8';
+const VERSION = '0.9.9';
 
 function parsePath(rawPath) {
   try {
@@ -24,7 +24,7 @@ function validateTranscriptClaim(body) {
 
 function providerFor(name) {
   if (name === 'codex') return codexProvider;
-  if (name === 'antigravity') return antigravityProvider;
+  if (name === 'api') return apiKeyProvider;
   throw new Error(`Fournisseur inconnu: ${name}`);
 }
 
@@ -35,7 +35,7 @@ async function directProvider(name, operation, message) {
 }
 
 function transportFor(provider) {
-  return provider === 'antigravity' ? 'extension-identity-pkce' : 'direct-codex-oauth';
+  return provider === 'api' ? 'direct-api-key' : 'direct-codex-oauth';
 }
 
 export async function routeRequest(message) {
@@ -48,7 +48,7 @@ export async function routeRequest(message) {
         transport: 'browser',
         providers: {
           codex: 'direct-oauth',
-          antigravity: 'extension-identity-pkce-experimental',
+          api: 'direct-api-key',
         },
       }, 'browser');
     }
@@ -56,7 +56,7 @@ export async function routeRequest(message) {
     if (pathname === '/account') return okResponse(await directProvider('codex', 'status', message), 'direct-codex-oauth');
     if (pathname === '/login') return okResponse(await directProvider('codex', 'login', message), 'direct-codex-oauth');
 
-    const providerRoute = pathname.match(/^\/providers\/(codex|antigravity)\/(status|models|login|logout)$/);
+    const providerRoute = pathname.match(/^\/providers\/(codex|api)\/(status|models|login|logout)$/);
     if (providerRoute) {
       const [, provider, operation] = providerRoute;
       return okResponse(await directProvider(provider, operation, message), transportFor(provider));

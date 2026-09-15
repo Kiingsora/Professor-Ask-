@@ -4,8 +4,8 @@ export const DEFAULTS = {
   provider: 'codex',
   codexModel: 'auto',
   codexEffort: 'auto',
-  antigravityModel: 'auto',
-  antigravityOAuthClientId: '',
+  apiProvider: 'gemini',
+  apiModel: 'auto',
   responseLanguage: 'auto',
   responseStyle: 'balanced',
   webSearch: 'auto',
@@ -22,7 +22,7 @@ export const DEFAULTS = {
 export const store = {
   settings: { ...DEFAULTS },
   saveTimer: null,
-  modelCatalogs: { codex: [], antigravity: [] },
+  modelCatalogs: { codex: [], api: [] },
 };
 
 export const $ = id => document.getElementById(id);

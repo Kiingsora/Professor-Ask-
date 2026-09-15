@@ -12,23 +12,23 @@
       <div>
         <p class="eyebrow">Professor Ask</p>
         <h1>Paramètres</h1>
-        <p class="lede">Connecte ton fournisseur, choisis le modèle utilisé et règle le contexte envoyé depuis YouTube.</p>
+        <p class="lede">Connecte ChatGPT ou utilise directement la clé API du fournisseur de ton choix.</p>
       </div>
       <div class="save-state" id="save-state">Enregistré</div>
     </header>
 
     <section class="settings-section">
-      <div class="section-heading"><div><h2>Fournisseur IA</h2><p>Codex et Antigravity se connectent directement depuis l’extension, sans application compagnon à lancer.</p></div></div>
+      <div class="section-heading"><div><h2>Fournisseur IA</h2><p>Codex utilise ton compte ChatGPT. Le mode API accepte plusieurs fournisseurs et conserve chaque clé uniquement dans le stockage privé de l’extension.</p></div></div>
       <div class="provider-grid">
         <label class="provider-card" data-provider-card="codex">
           <input type="radio" name="provider" value="codex" />
-          <div class="provider-card-main"><div class="provider-icon">C</div><div><strong>Codex</strong><span>OAuth ChatGPT direct · aucune installation</span></div></div>
+          <div class="provider-card-main"><div class="provider-icon">C</div><div><strong>Codex</strong><span>Compte ChatGPT · OAuth direct</span></div></div>
           <div class="provider-status muted" id="codex-status">Vérification…</div>
         </label>
-        <label class="provider-card" data-provider-card="antigravity">
-          <input type="radio" name="provider" value="antigravity" />
-          <div class="provider-card-main"><div class="provider-icon">A</div><div><strong>Antigravity</strong><span>Connexion Google · aucune installation</span></div></div>
-          <div class="provider-status muted" id="antigravity-status">Vérification…</div>
+        <label class="provider-card" data-provider-card="api">
+          <input type="radio" name="provider" value="api" />
+          <div class="provider-card-main"><div class="provider-icon">API</div><div><strong>Clé API</strong><span>Gemini, Claude, OpenAI, OpenRouter, Mistral, Groq</span></div></div>
+          <div class="provider-status muted" id="api-status">Vérification…</div>
         </label>
       </div>
 
@@ -57,37 +57,39 @@
         </div>
       </div>
 
-      <div class="connection-panel connection-stack" id="antigravity-panel" hidden>
-        <div class="connection-copy"><strong>Compte Google Antigravity</strong><p>L’expérience cible est la même que pour ChatGPT : clique sur « Se connecter avec Google », connecte ton compte sur la page Google, puis reviens à Professor Ask. Aucun secret, CLI ou serveur local n’est demandé à l’utilisateur.</p><small>Le client OAuth public de Professor Ask doit être enregistré une seule fois par l’éditeur de l’extension auprès de Google.</small></div>
+      <div class="connection-panel connection-stack" id="api-panel" hidden>
+        <div class="connection-copy"><strong>Fournisseur par clé API</strong><p>Choisis un fournisseur, colle sa clé puis enregistre-la. Professor Ask garde une clé séparée pour chaque fournisseur ; les clés ne sont jamais placées dans la synchronisation Chrome/Firefox.</p></div>
 
-        <div class="connection-actions">
-          <button class="button primary" id="connect-antigravity">Se connecter avec Google</button>
-          <button class="button" id="refresh-antigravity">Actualiser</button>
-          <button class="button" id="logout-antigravity">Déconnecter</button>
+        <div class="settings-grid">
+          <label class="field"><span>Fournisseur</span><select id="api-provider">
+            <option value="gemini">Google Gemini</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="openai">OpenAI</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="mistral">Mistral</option>
+            <option value="groq">Groq</option>
+          </select><small>Changer de fournisseur ne supprime pas les clés déjà enregistrées.</small></label>
+          <label class="field"><span>Clé API</span><input type="password" id="api-key" autocomplete="off" spellcheck="false" placeholder="Colle ta clé API ici" /><small>La clé est envoyée uniquement au fournisseur sélectionné depuis le background de l’extension.</small></label>
         </div>
 
-        <details class="developer-config" id="antigravity-developer-config">
-          <summary>Configuration développeur Antigravity</summary>
-          <p>Cette configuration est faite une seule fois pour la build Professor Ask. Les utilisateurs finaux n’ont pas à saisir de Client ID.</p>
-          <div class="settings-grid full-grid">
-            <label class="field"><span>Client ID OAuth Google de Professor Ask</span><input type="text" id="antigravity-oauth-client-id" autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com" /><small>Client OAuth de type <strong>Extension Chrome</strong> associé à l’ID stable de Professor Ask.</small></label>
-            <div class="field"><span>ID de l’extension</span><code id="antigravity-extension-id">Chargement…</code><small>Item ID à enregistrer une seule fois dans Google Cloud.</small></div>
-          </div>
-          <p class="provider-help">URI de retour : <code id="antigravity-redirect-uri">Chargement…</code></p>
-        </details>
+        <div class="connection-actions full-grid">
+          <button class="button primary" id="connect-api">Enregistrer la clé</button>
+          <button class="button" id="refresh-api">Tester / Actualiser les modèles</button>
+          <button class="button danger" id="logout-api">Supprimer la clé</button>
+        </div>
 
         <div class="settings-grid full-grid provider-model-grid">
-          <label class="field"><span>Modèle Antigravity</span><select id="antigravity-model"><option value="auto">Automatique</option></select><small>La liste est récupérée directement depuis le compte Antigravity connecté.</small></label>
+          <label class="field"><span>Modèle</span><select id="api-model"><option value="auto">Automatique</option></select><small>La liste est récupérée directement depuis l’API du fournisseur lorsque la clé est enregistrée.</small></label>
         </div>
       </div>
     </section>
 
     <section class="settings-section">
-      <div class="section-heading"><div><h2>Réponses de l’IA</h2><p>Détermine comment Professor Ask formule et vérifie ses réponses.</p></div></div>
+      <div class="section-heading"><div><h2>Réponses de l’IA</h2><p>Détermine comment Professor Ask formule ses réponses.</p></div></div>
       <div class="settings-grid">
         <label class="field"><span>Langue des réponses</span><select id="response-language"><option value="auto">Automatique</option><option value="fr">Français</option><option value="en">Anglais</option></select></label>
         <label class="field"><span>Niveau de détail</span><select id="response-style"><option value="concise">Concis</option><option value="balanced">Équilibré</option><option value="detailed">Détaillé</option></select></label>
-        <label class="field"><span>Recherche web</span><select id="web-search"><option value="auto">Automatique si nécessaire</option><option value="always">Toujours vérifier si pertinent</option><option value="off">Désactivée</option></select></label>
+        <label class="field"><span>Recherche web</span><select id="web-search"><option value="auto">Automatique si nécessaire</option><option value="always">Toujours vérifier si pertinent</option><option value="off">Désactivée</option></select><small>Actuellement utilisée par Codex. Les fournisseurs par clé API répondent sans outil web additionnel.</small></label>
         <label class="toggle-row"><div><span>Mettre la vidéo en pause quand j’envoie une question</span><small>Fige le moment exact utilisé comme contexte.</small></div><input type="checkbox" id="pause-on-question" /></label>
       </div>
     </section>
@@ -118,7 +120,7 @@
       <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
     </section>
 
-    <footer class="footer-note"><span>Codex + Antigravity : <code>OAuth direct dans le navigateur</code></span><span>Professor Ask v0.9.8</span></footer>
+    <footer class="footer-note"><span>Codex OAuth + fournisseurs <code>API</code></span><span>Professor Ask v0.9.9</span></footer>
   </main>
   <script type="module" src="index.js"></script>
 </body>

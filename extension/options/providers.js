@@ -1,4 +1,4 @@
-import { $, openExternal, providerRequest } from './core.js';
+import { $, openExternal, providerRequest, store } from './core.js';
 import { populateModels, setProviderStatus } from './form.js';
 
 function setCodexDeviceCode(userCode = '') {
@@ -11,15 +11,25 @@ function setCodexDeviceCode(userCode = '') {
   panel.hidden = !value;
 }
 
+function apiProviderBody(extra = {}) {
+  return { apiProvider: store.settings.apiProvider || 'gemini', ...extra };
+}
+
+function selectedApiLabel() {
+  return $('api-provider')?.selectedOptions?.[0]?.textContent?.trim() || 'API';
+}
+
 export async function loadModels(provider) {
-  const response = await providerRequest(`/providers/${provider}/models`);
+  const options = provider === 'api' ? { body: apiProviderBody() } : undefined;
+  const response = await providerRequest(`/providers/${provider}/models`, options);
   if (!response.ok) throw new Error(response.error || response.data?.error || 'Impossible de charger les modèles.');
   populateModels(provider, response.data?.models || []);
 }
 
 export async function refreshProvider(provider, { withModels = true } = {}) {
   setProviderStatus(provider, 'Vérification…', 'muted');
-  const response = await providerRequest(`/providers/${provider}/status`).catch(error => ({ ok: false, error: error.message }));
+  const options = provider === 'api' ? { body: apiProviderBody() } : undefined;
+  const response = await providerRequest(`/providers/${provider}/status`, options).catch(error => ({ ok: false, error: error.message }));
   const data = response?.data || {};
 
   if (!response?.ok) {
@@ -28,20 +38,17 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
     return false;
   }
 
-  if (data.pending) {
-    if (provider === 'codex') {
-      setCodexDeviceCode(data.userCode || '');
-      const error = data.error ? ` · ${data.error}` : '';
-      setProviderStatus(provider, `Connexion ChatGPT en attente${error}`, 'warn');
-    } else {
-      setProviderStatus(provider, data.error || 'Connexion Google Antigravity en attente…', 'warn');
-    }
+  if (data.pending && provider === 'codex') {
+    setCodexDeviceCode(data.userCode || '');
+    const error = data.error ? ` · ${data.error}` : '';
+    setProviderStatus(provider, `Connexion ChatGPT en attente${error}`, 'warn');
     return false;
   }
 
   if (!data.connected) {
     if (provider === 'codex') setCodexDeviceCode('');
-    setProviderStatus(provider, data.error || 'Non connecté', 'warn');
+    if (provider === 'api') populateModels('api', []);
+    setProviderStatus(provider, provider === 'api' ? `Aucune clé ${selectedApiLabel()} enregistrée` : (data.error || 'Non connecté'), 'warn');
     return false;
   }
 
@@ -51,13 +58,17 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
     const plan = data.account?.plan_type || data.account?.planType;
     setProviderStatus(provider, `Connecté${email}${plan ? ` · ${plan}` : ''}`, '');
   } else {
-    const email = data.account?.email ? ` · ${data.account.email}` : '';
-    setProviderStatus(provider, `Connecté à Antigravity${email}`, '');
+    setProviderStatus(provider, `Clé ${data.providerLabel || selectedApiLabel()} enregistrée`, '');
   }
 
   if (withModels) {
-    try { await loadModels(provider); }
-    catch (error) { setProviderStatus(provider, `Connecté · modèles indisponibles : ${error.message}`, 'warn'); }
+    try {
+      await loadModels(provider);
+    } catch (error) {
+      setProviderStatus(provider, provider === 'api'
+        ? `Clé enregistrée · modèles indisponibles : ${error.message}`
+        : `Connecté · modèles indisponibles : ${error.message}`, 'warn');
+    }
   }
   return true;
 }
@@ -65,23 +76,35 @@ export async function refreshProvider(provider, { withModels = true } = {}) {
 export async function connectProvider(provider) {
   const button = $(`connect-${provider}`);
   button.disabled = true;
-  button.textContent = provider === 'codex' ? 'Ouverture ChatGPT…' : 'Ouverture Google…';
-  setProviderStatus(provider, 'Démarrage de la connexion…', 'warn');
+  button.textContent = provider === 'codex' ? 'Ouverture ChatGPT…' : 'Enregistrement…';
+  setProviderStatus(provider, provider === 'codex' ? 'Démarrage de la connexion…' : 'Enregistrement de la clé…', 'warn');
 
   try {
-    const response = await providerRequest(`/providers/${provider}/login`, { method: 'POST' });
-    const data = response.data || {};
-    if (!response.ok) throw new Error(response.error || data.error || 'Impossible de lancer la connexion.');
+    if (provider === 'api') {
+      const input = $('api-key');
+      const apiKey = input?.value?.trim() || '';
+      if (!apiKey) throw new Error(`Saisis ta clé API ${selectedApiLabel()}.`);
 
-    if (provider === 'antigravity') {
-      if (!data.connected) throw new Error(data.error || 'La connexion Google Antigravity n’a pas abouti.');
-      const email = data.account?.email ? ` · ${data.account.email}` : '';
-      setProviderStatus(provider, `Connecté à Antigravity${email}`, '');
-      await loadModels(provider).catch(error => {
-        setProviderStatus(provider, `Connecté · modèles indisponibles : ${error.message}`, 'warn');
+      const response = await providerRequest('/providers/api/login', {
+        method: 'POST',
+        body: apiProviderBody({ apiKey }),
       });
+      const data = response.data || {};
+      if (!response.ok || !data.connected) throw new Error(response.error || data.error || 'Impossible d’enregistrer la clé API.');
+
+      input.value = '';
+      setProviderStatus('api', `Clé ${data.providerLabel || selectedApiLabel()} enregistrée`, '');
+      try {
+        await loadModels('api');
+      } catch (error) {
+        setProviderStatus('api', `Clé enregistrée · modèles indisponibles : ${error.message}`, 'warn');
+      }
       return;
     }
+
+    const response = await providerRequest('/providers/codex/login', { method: 'POST' });
+    const data = response.data || {};
+    if (!response.ok) throw new Error(response.error || data.error || 'Impossible de lancer la connexion.');
 
     setCodexDeviceCode(data.userCode || '');
     if (data.authUrl && !data.opened) await openExternal(data.authUrl);
@@ -113,17 +136,20 @@ export async function connectProvider(provider) {
     setProviderStatus(provider, error.message, 'warn');
   } finally {
     button.disabled = false;
-    button.textContent = provider === 'codex' ? 'Se connecter avec ChatGPT' : 'Se connecter avec Google';
+    button.textContent = provider === 'codex' ? 'Se connecter avec ChatGPT' : 'Enregistrer la clé';
   }
 }
 
 export async function logoutProvider(provider) {
-  const response = await providerRequest(`/providers/${provider}/logout`, { method: 'POST' });
+  const options = provider === 'api'
+    ? { method: 'POST', body: apiProviderBody() }
+    : { method: 'POST' };
+  const response = await providerRequest(`/providers/${provider}/logout`, options);
   if (!response.ok) {
     setProviderStatus(provider, response.error || response.data?.error || 'Déconnexion impossible.', 'warn');
     return;
   }
   if (provider === 'codex') setCodexDeviceCode('');
   populateModels(provider, []);
-  setProviderStatus(provider, 'Déconnecté', 'warn');
+  setProviderStatus(provider, provider === 'api' ? `Clé ${selectedApiLabel()} supprimée` : 'Déconnecté', 'warn');
 }

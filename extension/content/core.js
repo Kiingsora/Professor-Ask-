@@ -3,7 +3,8 @@
     provider: 'codex',
     codexModel: 'auto',
     codexEffort: 'auto',
-    antigravityModel: 'auto',
+    apiProvider: 'gemini',
+    apiModel: 'auto',
     responseLanguage: 'auto',
     responseStyle: 'balanced',
     webSearch: 'auto',
@@ -15,6 +16,15 @@
     panelSize: 'standard',
     rememberHistory: true,
     historyLimit: 30,
+  };
+
+  const API_PROVIDER_NAMES = {
+    gemini: 'Gemini',
+    anthropic: 'Claude',
+    openai: 'OpenAI',
+    openrouter: 'OpenRouter',
+    mistral: 'Mistral',
+    groq: 'Groq',
   };
 
   const ext = globalThis.browser ?? globalThis.chrome;
@@ -63,15 +73,17 @@
       return video ? video.currentTime || 0 : 0;
     },
     providerName() {
-      return state.settings.provider === 'antigravity' ? 'Antigravity' : 'Codex';
+      if (state.settings.provider === 'api') return API_PROVIDER_NAMES[state.settings.apiProvider] || 'API';
+      return 'Codex';
     },
     selectedModelName() {
-      return state.settings.provider === 'antigravity'
-        ? state.settings.antigravityModel || 'auto'
+      return state.settings.provider === 'api'
+        ? state.settings.apiModel || 'auto'
         : state.settings.codexModel || 'auto';
     },
     async loadSettings() {
       const saved = await ext.storage.sync.get(DEFAULTS);
+      if (saved.provider === 'antigravity') saved.provider = 'api';
       state.settings = { ...DEFAULTS, ...saved };
       api.applyAppearance?.();
       api.renderStatus?.();

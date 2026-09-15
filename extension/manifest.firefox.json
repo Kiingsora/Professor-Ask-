@@ -1,19 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Professor Ask",
-  "version": "0.9.8",
-  "description": "Discuss YouTube videos with Codex or Google Antigravity using timestamped transcript context.",
-  "permissions": ["storage", "tabs", "identity"],
+  "version": "0.9.9",
+  "description": "Discuss YouTube videos with ChatGPT/Codex or your own AI provider API key using timestamped transcript context.",
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://auth.openai.com/*",
     "https://chatgpt.com/backend-api/codex/*",
-    "https://accounts.google.com/*",
-    "https://oauth2.googleapis.com/*",
-    "https://www.googleapis.com/*",
-    "https://cloudcode-pa.googleapis.com/*",
-    "https://daily-cloudcode-pa.sandbox.googleapis.com/*",
-    "https://autopush-cloudcode-pa.sandbox.googleapis.com/*"
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://openrouter.ai/*",
+    "https://api.mistral.ai/*",
+    "https://api.groq.com/*"
   ],
   "background": {
     "scripts": ["background/index.js"],

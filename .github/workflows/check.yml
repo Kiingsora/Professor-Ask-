@@ -14,7 +14,7 @@ jobs:
           node-version: '20'
       - name: Check JavaScript syntax
         run: |
-          find extension native-host scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+          find extension scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
       - name: Validate source manifests
         run: |
           node - <<'NODE'
@@ -26,41 +26,23 @@ jobs:
           if (!firefox.background?.scripts?.length) throw new Error('Firefox background scripts missing');
           if ('key' in firefox) throw new Error('Firefox manifest must not contain Chrome key');
           if (!firefox.browser_specific_settings?.gecko?.id) throw new Error('Firefox Gecko ID missing');
+          if (chrome.permissions?.includes('nativeMessaging')) throw new Error('nativeMessaging must not be required');
+          if (chrome.permissions?.includes('identity')) throw new Error('Identity permission is no longer needed');
+          const requiredHosts = [
+            'https://api.openai.com/*',
+            'https://api.anthropic.com/*',
+            'https://generativelanguage.googleapis.com/*',
+            'https://openrouter.ai/*',
+            'https://api.mistral.ai/*',
+            'https://api.groq.com/*',
+          ];
+          for (const host of requiredHosts) {
+            if (!chrome.host_permissions?.includes(host)) throw new Error(`Missing Chromium API host: ${host}`);
+            if (!firefox.host_permissions?.includes(host)) throw new Error(`Missing Firefox API host: ${host}`);
+          }
           NODE
       - name: Build Chromium and Firefox packages
         run: node scripts/build-extension.mjs
       - name: Validate built manifests
         run: |
           node -e "JSON.parse(require('fs').readFileSync('dist/chromium/manifest.json','utf8')); JSON.parse(require('fs').readFileSync('dist/firefox/manifest.json','utf8'));"
-      - name: Smoke test Native Messaging protocol
-        run: node native-host/test-native-host.mjs
-
-  native-host-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Compile and register optional Antigravity companion
-        shell: powershell
-        run: |
-          & .\native-host\install.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Native host installer failed' }
-
-          $registryPath = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.professorask.bridge'
-          if (-not (Test-Path $registryPath)) { throw 'Native host registry entry missing' }
-
-          $manifestPath = (Get-Item $registryPath).GetValue('')
-          if (-not $manifestPath) { throw 'Native host manifest registry value missing' }
-          if (-not (Test-Path $manifestPath)) { throw "Native host manifest missing: $manifestPath" }
-
-          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          if ($manifest.name -ne 'com.professorask.bridge') { throw 'Unexpected native host name' }
-          if ($manifest.allowed_origins[0] -ne 'chrome-extension://geibmmecfgilkhncpcjjldbidnejflfb/') { throw 'Unexpected extension origin' }
-          if (-not (Test-Path $manifest.path)) { throw "Native host executable missing: $($manifest.path)" }
-
-          $installRoot = Join-Path $env:LOCALAPPDATA 'ProfessorAsk\NativeHost\0.7.0'
-          if (-not ($manifest.path.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase))) {
-            throw "Native host was not installed under LocalAppData: $($manifest.path)"
-          }
