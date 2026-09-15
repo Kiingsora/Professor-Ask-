@@ -15,15 +15,15 @@ export const API_PROVIDERS = {
     protocol: 'anthropic',
     modelsUrl: 'https://api.anthropic.com/v1/models',
     chatUrl: 'https://api.anthropic.com/v1/messages',
-    preferredModels: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-sonnet-4-5'],
+    preferredModels: ['claude-sonnet-5', 'claude-opus-5', 'claude-fable-5', 'claude-sonnet-4-6'],
   },
   openai: {
     id: 'openai',
     label: 'OpenAI',
-    protocol: 'openai',
+    protocol: 'openai-responses',
     modelsUrl: 'https://api.openai.com/v1/models',
-    chatUrl: 'https://api.openai.com/v1/chat/completions',
-    preferredModels: ['gpt-5.6', 'gpt-5.4', 'gpt-5', 'gpt-4.1'],
+    chatUrl: 'https://api.openai.com/v1/responses',
+    preferredModels: ['gpt-5.6-sol', 'gpt-5.6', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.4'],
   },
   openrouter: {
     id: 'openrouter',
@@ -31,7 +31,7 @@ export const API_PROVIDERS = {
     protocol: 'openai',
     modelsUrl: 'https://openrouter.ai/api/v1/models',
     chatUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    preferredModels: ['google/gemini-3-flash', 'anthropic/claude-sonnet-4.6', 'openai/gpt-5'],
+    preferredModels: ['anthropic/claude-sonnet-5', 'openai/gpt-5.6', 'google/gemini-3.5-flash'],
   },
   mistral: {
     id: 'mistral',

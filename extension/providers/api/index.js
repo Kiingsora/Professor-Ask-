@@ -141,7 +141,8 @@ export async function models(body = {}) {
 async function resolveModel(provider, requested, key) {
   if (requested && requested !== 'auto') return normalizeModelId(requested);
 
-  let catalog = modelCache.get(provider)?.models;
+  const cached = modelCache.get(provider);
+  let catalog = cached && Date.now() - cached.at < MODEL_CACHE_MS ? cached.models : null;
   if (!catalog?.length) {
     catalog = await fetchModels(provider, key);
     if (catalog.length) modelCache.set(provider, { at: Date.now(), models: catalog });
@@ -185,6 +186,34 @@ async function chatOpenAiCompatible(provider, config, key, model, prompt) {
       : '';
   if (!answer) throw new Error(`${config.label} a terminé la réponse sans texte exploitable.`);
   return { answer, sources: [], model, usage: data?.usage || null };
+}
+
+function openAiResponseText(data) {
+  if (typeof data?.output_text === 'string' && data.output_text.trim()) return data.output_text.trim();
+  const output = Array.isArray(data?.output) ? data.output : [];
+  return output
+    .flatMap(item => Array.isArray(item?.content) ? item.content : [])
+    .filter(part => part?.type === 'output_text' && typeof part?.text === 'string')
+    .map(part => part.text)
+    .join('')
+    .trim();
+}
+
+async function chatOpenAiResponses(config, key, model, prompt, style) {
+  const data = await requestJson(config.chatUrl, {
+    method: 'POST',
+    headers: headersFor('openai', key, true),
+    body: JSON.stringify({
+      model,
+      input: prompt,
+      max_output_tokens: maxOutputTokens(style),
+      store: false,
+    }),
+  }, 'OpenAI a refusé la requête de réponse.');
+
+  const answer = openAiResponseText(data);
+  if (!answer) throw new Error('OpenAI a terminé la réponse sans texte exploitable.');
+  return { answer, sources: [], model: data?.model || model, usage: data?.usage || null };
 }
 
 async function chatAnthropic(config, key, model, prompt, style) {
@@ -239,6 +268,9 @@ export async function chat(payload = {}) {
   }
   if (config.protocol === 'gemini') {
     return chatGemini(config, key, model, prompt, payload.settings?.responseStyle);
+  }
+  if (config.protocol === 'openai-responses') {
+    return chatOpenAiResponses(config, key, model, prompt, payload.settings?.responseStyle);
   }
   return chatOpenAiCompatible(provider, config, key, model, prompt);
 }
