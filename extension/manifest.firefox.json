@@ -55,6 +55,7 @@
         "content/transcript/status.js",
         "content/transcript/manager.js",
         "content/transcript/preview.js",
+        "content/answer.js",
         "content/ui.js",
         "content/chat.js",
         "content/app.js"
