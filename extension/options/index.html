@@ -95,11 +95,11 @@
     </section>
 
     <section class="settings-section">
-      <div class="section-heading"><div><h2>Contexte vidéo</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent. S’ils sont absents, le fallback local devra s’exécuter directement dans l’extension.</p></div></div>
+      <div class="section-heading"><div><h2>Transcription</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent et les transforme en transcription horodatée utilisable autour du moment actuel.</p></div></div>
       <div class="settings-grid">
-        <label class="field"><span>Fenêtre de contexte autour du timestamp</span><select id="context-seconds"><option value="60">± 1 minute</option><option value="180">± 3 minutes</option><option value="300">± 5 minutes</option><option value="600">± 10 minutes</option></select></label>
+        <label class="field"><span>Fenêtre de transcription autour du timestamp</span><select id="context-seconds"><option value="60">± 1 minute</option><option value="180">± 3 minutes</option><option value="300">± 5 minutes</option><option value="600">± 10 minutes</option></select></label>
         <label class="field"><span>Langue de transcription préférée</span><select id="transcript-language"><option value="auto">Automatique</option><option value="fr">Français en priorité</option><option value="en">Anglais en priorité</option></select></label>
-        <label class="toggle-row"><div><span>Inclure le titre et la chaîne</span><small>Ajoute les métadonnées de la vidéo au contexte.</small></div><input type="checkbox" id="include-metadata" /></label>
+        <label class="toggle-row"><div><span>Inclure le titre et la chaîne</span><small>Ajoute les métadonnées de la vidéo à la question.</small></div><input type="checkbox" id="include-metadata" /></label>
       </div>
     </section>
 
