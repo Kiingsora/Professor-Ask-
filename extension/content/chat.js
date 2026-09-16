@@ -90,7 +90,7 @@
 
       const data = response.data || {};
       if (!response.ok) throw new Error(response.error || data.error || `Erreur ${PA.providerName()}`);
-      placeholder.lastElementChild.textContent = PA.formatAnswer(data.answer, data.sources);
+      PA.renderAnswer(placeholder?.querySelector('.pa-msg-body'), data.answer, data.sources);
       await PA.saveHistory();
     } catch (error) {
       placeholder?.remove();
