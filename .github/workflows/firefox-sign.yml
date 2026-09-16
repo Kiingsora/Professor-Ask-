@@ -1,0 +1,48 @@
+name: Sign Firefox Extension
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sign-firefox:
+    runs-on: ubuntu-latest
+    env:
+      AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+      AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify Mozilla signing secrets
+        run: |
+          test -n "$AMO_API_KEY" || (echo "Missing repository secret AMO_API_KEY" && exit 1)
+          test -n "$AMO_API_SECRET" || (echo "Missing repository secret AMO_API_SECRET" && exit 1)
+
+      - name: Build Firefox extension
+        run: node scripts/build-extension.mjs
+
+      - name: Sign unlisted Firefox extension
+        run: |
+          mkdir -p artifacts/firefox
+          npx --yes web-ext@latest sign \
+            --source-dir=dist/firefox \
+            --artifacts-dir=artifacts/firefox \
+            --channel=unlisted \
+            --api-key="$AMO_API_KEY" \
+            --api-secret="$AMO_API_SECRET"
+
+      - name: Upload signed XPI
+        uses: actions/upload-artifact@v4
+        with:
+          name: professor-ask-firefox-signed
+          path: artifacts/firefox/*.xpi
+          if-no-files-found: error
