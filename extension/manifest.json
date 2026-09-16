@@ -4,6 +4,12 @@
   "version": "0.10.0",
   "description": "Discuss YouTube videos with ChatGPT/Codex or your own AI provider API key using timestamped transcript context.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkUJNlOEw7E1LHQqkIXHlRshYG5m2rk/y8dkgG1xKZhv+RpCUQHoZz35kvdSelBt+znaJRcBClc78GDDKTxMYu5eZdykMVAZZHBbMbTCaf/jOE5JJ36dZb+yMFvucY2zoUaKeKR/MJcPT54bLBARsQhPzAj+UnKm6GIF4xbCg2/uyiNwVt7oL5nsgTxGlHygOVe6PAfmJUA8X87sB59Hp4XFQeIVt2AmJS9d3+Wy9+sPiRD3rixaa++5ZamGPcd4x9/cX6r5H8QHj9iXwQwC0M60d8YsVZt+R9cYo9DakNV+3qjkuzgCOkdW18rUTZHPGExuBMlIdkKrfIwPPOtlzNQIDAQAB",
+  "icons": {
+    "16": "icons/professor-ask.png",
+    "32": "icons/professor-ask.png",
+    "48": "icons/professor-ask.png",
+    "128": "icons/professor-ask.png"
+  },
   "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -21,7 +27,11 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Ouvrir les paramètres Professor Ask"
+    "default_title": "Ouvrir les paramètres Professor Ask",
+    "default_icon": {
+      "16": "icons/professor-ask.png",
+      "32": "icons/professor-ask.png"
+    }
   },
   "options_ui": {
     "page": "options/index.html",

@@ -3,6 +3,12 @@
   "name": "Professor Ask",
   "version": "0.10.0",
   "description": "Discuss YouTube videos with ChatGPT/Codex or your own AI provider API key using timestamped transcript context.",
+  "icons": {
+    "16": "icons/professor-ask.png",
+    "32": "icons/professor-ask.png",
+    "48": "icons/professor-ask.png",
+    "128": "icons/professor-ask.png"
+  },
   "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://www.youtube.com/*",
@@ -20,7 +26,11 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Ouvrir les paramètres Professor Ask"
+    "default_title": "Ouvrir les paramètres Professor Ask",
+    "default_icon": {
+      "16": "icons/professor-ask.png",
+      "32": "icons/professor-ask.png"
+    }
   },
   "options_ui": {
     "page": "options/index.html",
