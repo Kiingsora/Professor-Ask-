@@ -30,6 +30,10 @@
   const ext = globalThis.browser ?? globalThis.chrome;
   if (!ext?.runtime || !ext?.storage) throw new Error('WebExtension API unavailable.');
 
+  function isExtensionContextInvalidated(error) {
+    return String(error?.message || error || '').includes('Extension context invalidated');
+  }
+
   const state = {
     videoId: null,
     transcript: [],
@@ -41,6 +45,7 @@
     connected: false,
     providerStatus: null,
     busy: false,
+    contextValid: true,
     lastUrl: location.href,
     settings: { ...DEFAULTS },
   };
@@ -49,13 +54,19 @@
     DEFAULTS,
     ext,
     state,
+    isExtensionContextInvalidated,
     qs(selector, root = document) {
       return root.querySelector(selector);
     },
     async providerRequest(path, { method = 'GET', body } = {}) {
-      const response = await ext.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body });
-      if (!response) throw new Error('Aucune réponse du background Professor Ask.');
-      return response;
+      try {
+        const response = await ext.runtime.sendMessage({ type: 'PROVIDER_REQUEST', path, method, body });
+        if (!response) throw new Error('Aucune réponse du background Professor Ask.');
+        return response;
+      } catch (error) {
+        if (isExtensionContextInvalidated(error)) state.contextValid = false;
+        throw error;
+      }
     },
     getVideoId() {
       try { return new URL(location.href).searchParams.get('v'); }
@@ -82,11 +93,21 @@
         : state.settings.codexModel || 'auto';
     },
     async loadSettings() {
-      const saved = await ext.storage.sync.get(DEFAULTS);
-      if (saved.provider === 'antigravity') saved.provider = 'api';
-      state.settings = { ...DEFAULTS, ...saved };
-      api.applyAppearance?.();
-      api.renderStatus?.();
+      try {
+        const saved = await ext.storage.sync.get(DEFAULTS);
+        if (saved.provider === 'antigravity') saved.provider = 'api';
+        state.settings = { ...DEFAULTS, ...saved };
+        state.contextValid = true;
+        api.applyAppearance?.();
+        api.renderStatus?.();
+        return true;
+      } catch (error) {
+        if (isExtensionContextInvalidated(error)) {
+          state.contextValid = false;
+          return false;
+        }
+        throw error;
+      }
     },
   };
 
