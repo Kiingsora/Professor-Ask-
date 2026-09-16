@@ -1,7 +1,7 @@
 import { apiKeyProvider } from '../providers/api/index.js';
 import { codexProvider } from '../providers/codex/index.js';
 
-const VERSION = '0.9.9';
+const VERSION = '0.10.0';
 
 function parsePath(rawPath) {
   try {
@@ -19,7 +19,7 @@ function validateTranscriptClaim(body) {
   if (!body?.transcriptAvailable) return;
   const hasText = Array.isArray(body?.transcript)
     && body.transcript.some(segment => String(segment?.text || '').trim());
-  if (!hasText) throw new Error('Le contexte vidéo est marqué disponible mais aucun segment de sous-titre valide n’a été fourni.');
+  if (!hasText) throw new Error('La transcription est marquée disponible mais aucun segment horodaté valide n’a été fourni.');
 }
 
 function providerFor(name) {

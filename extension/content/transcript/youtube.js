@@ -40,9 +40,14 @@
     return null;
   }
 
+  function languageMatches(value, preferred) {
+    if (!value || !preferred || preferred === 'auto') return false;
+    return String(value).toLowerCase().startsWith(String(preferred).toLowerCase());
+  }
+
   function languageScore(track, preferred, browserLanguage) {
     const code = String(track.languageCode || '').toLowerCase();
-    if (preferred !== 'auto' && code.startsWith(preferred.toLowerCase())) return 40;
+    if (preferred !== 'auto' && code.startsWith(preferred.toLowerCase())) return 1000;
     if (browserLanguage && code.startsWith(browserLanguage.toLowerCase())) return 30;
     if (code.startsWith('fr')) return 20;
     if (code.startsWith('en')) return 10;
@@ -70,12 +75,13 @@
       || null;
   }
 
-  function withCaptionDiagnostics(diagnostics, tracks) {
+  function withCaptionDiagnostics(diagnostics, tracks, extra = null) {
     const list = Array.isArray(tracks) ? tracks : [];
     return {
       ...(diagnostics || {}),
       caption_track_count: list.length,
       caption_languages: [...new Set(list.map(track => track?.languageCode).filter(Boolean))],
+      ...(extra || {}),
     };
   }
 
@@ -184,6 +190,22 @@
     return null;
   }
 
+  async function tryPreferredLanguage(tracks) {
+    const preferred = PA.state.settings.transcriptLanguage || 'auto';
+    if (preferred === 'auto') return null;
+
+    const matchingTracks = tracks.filter(track => languageMatches(track?.languageCode, preferred));
+    if (!matchingTracks.length) return null;
+
+    const result = await tryTimedTextTracks(matchingTracks);
+    if (!result) return null;
+    result.diagnostics = withCaptionDiagnostics(result.diagnostics, tracks, {
+      requested_language: preferred,
+      language_preference_applied: true,
+    });
+    return result;
+  }
+
   PA.fetchYoutubeTranscript = async function fetchYoutubeTranscript() {
     const videoId = PA.state.videoId || PA.getVideoId();
     let liveResult = null;
@@ -193,9 +215,25 @@
       liveResult = await requestLiveTranscript(videoId);
       if (liveResult?.ok && Array.isArray(liveResult.segments) && liveResult.segments.length) {
         const tracks = Array.isArray(liveResult.tracks) ? liveResult.tracks : [];
+        const preferred = PA.state.settings.transcriptLanguage || 'auto';
+
+        if (preferred !== 'auto' && tracks.some(track => languageMatches(track?.languageCode, preferred))) {
+          try {
+            const preferredResult = await tryPreferredLanguage(tracks);
+            if (preferredResult) return preferredResult;
+          } catch {
+            // Keep the reliable get_panel transcript if the preferred timedtext track cannot be fetched.
+          }
+        }
+
         return {
           segments: liveResult.segments,
-          diagnostics: withCaptionDiagnostics(liveResult.diagnostics, tracks),
+          diagnostics: withCaptionDiagnostics(liveResult.diagnostics, tracks, preferred !== 'auto'
+            ? {
+              requested_language: preferred,
+              language_preference_applied: languageMatches(liveResult.diagnostics?.detected_language, preferred),
+            }
+            : null),
         };
       }
     } catch (error) {
@@ -214,6 +252,9 @@
     let directError = null;
     if (tracks.length) {
       try {
+        const preferredResult = await tryPreferredLanguage(tracks);
+        if (preferredResult) return preferredResult;
+
         const direct = await tryTimedTextTracks(tracks);
         if (direct) {
           direct.diagnostics = withCaptionDiagnostics(direct.diagnostics, tracks);

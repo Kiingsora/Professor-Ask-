@@ -1,4 +1,4 @@
-import { MODEL_CACHE_MS, MODELS_URL, SPARK_MODEL } from './config.js';
+import { MODEL_CACHE_MS, MODELS_URL, SPARK_MODEL, SPARK_MODEL_ID } from './config.js';
 import { getValidAuth } from './auth.js';
 import { authorizedFetch } from './client.js';
 import { accountInfo } from './identity.js';
@@ -18,7 +18,7 @@ function normalizeEfforts(item) {
 
 function withSparkFallback(models) {
   if (models.some(model => model.id === SPARK_MODEL.id)) return models;
-  return [{ ...SPARK_MODEL }, ...models];
+  return [...models, { ...SPARK_MODEL }];
 }
 
 export async function models({ force = false } = {}) {
@@ -62,7 +62,10 @@ export async function resolveModel(selected) {
 
   try {
     const catalog = (await models()).models;
-    return catalog.find(item => item.isDefault)?.id || catalog[0]?.id || 'gpt-5.6-sol';
+    return catalog.find(item => item.isDefault)?.id
+      || catalog.find(item => item.id !== SPARK_MODEL_ID)?.id
+      || catalog[0]?.id
+      || 'gpt-5.6-sol';
   } catch {
     return 'gpt-5.6-sol';
   }

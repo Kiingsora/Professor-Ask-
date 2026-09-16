@@ -8,18 +8,19 @@ import { parseCodexSuccess } from './stream.js';
 export async function chat(payload) {
   const model = await resolveModel(payload.settings?.codexModel);
   const effort = payload.settings?.codexEffort;
-  const webEnabled = payload.settings?.webSearch !== 'off';
+  const webMode = payload.settings?.webSearch || 'auto';
+  const webEnabled = webMode !== 'off';
 
   const body = {
     model,
-    instructions: 'You are Professor Ask, an educational assistant for the currently watched YouTube video. Follow the per-turn transcript, language, detail, and web instructions exactly. Return plain text only: no Markdown headings, no #, no bold or italic markers, and no decorative bullets. When grounding a point in the video, format it as [timestamp] content. Concise mode is strict.',
+    instructions: 'You are Professor Ask, an educational assistant for discussing the currently watched YouTube video. Follow the per-turn transcript, language, detail, formatting, and web-search instructions.',
     input: [{
       type: 'message',
       role: 'user',
       content: [{ type: 'input_text', text: buildProfessorPrompt(payload) }],
     }],
     tools: webEnabled ? [{ type: 'web_search', external_web_access: true }] : [],
-    tool_choice: 'auto',
+    tool_choice: webMode === 'always' && webEnabled ? 'required' : 'auto',
     parallel_tool_calls: true,
     store: false,
     stream: true,

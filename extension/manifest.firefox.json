@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Professor Ask",
-  "version": "0.9.9",
+  "version": "0.10.0",
   "description": "Discuss YouTube videos with ChatGPT/Codex or your own AI provider API key using timestamped transcript context.",
   "permissions": ["storage", "tabs"],
   "host_permissions": [

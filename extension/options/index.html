@@ -53,7 +53,7 @@
 
         <div class="settings-grid full-grid provider-model-grid">
           <label class="field"><span>Modèle Codex</span><select id="codex-model"><option value="auto">Automatique</option></select><small>Le catalogue est récupéré directement depuis le compte Codex connecté.</small></label>
-          <label class="field"><span>Effort de raisonnement</span><select id="codex-effort"><option value="auto">Automatique</option></select><small>Les niveaux affichés dépendent du modèle sélectionné.</small></label>
+          <label class="field"><span>Effort de raisonnement</span><select id="codex-effort"><option value="auto">Automatique</option></select><small id="codex-effort-help">Les niveaux affichés dépendent du modèle sélectionné.</small></label>
         </div>
       </div>
 
@@ -89,7 +89,7 @@
       <div class="settings-grid">
         <label class="field"><span>Langue des réponses</span><select id="response-language"><option value="auto">Automatique</option><option value="fr">Français</option><option value="en">Anglais</option></select></label>
         <label class="field"><span>Niveau de détail</span><select id="response-style"><option value="concise">Concis</option><option value="balanced">Équilibré</option><option value="detailed">Détaillé</option></select></label>
-        <label class="field"><span>Recherche web</span><select id="web-search"><option value="auto">Automatique si nécessaire</option><option value="always">Toujours vérifier si pertinent</option><option value="off">Désactivée</option></select><small>Actuellement utilisée par Codex. Les fournisseurs par clé API répondent sans outil web additionnel.</small></label>
+        <label class="field" id="web-search-field"><span>Recherche web</span><select id="web-search"><option value="auto">Automatique si nécessaire</option><option value="always">Toujours vérifier</option><option value="off">Désactivée</option></select><small id="web-search-help">Codex peut rechercher sur le web.</small></label>
         <label class="toggle-row"><div><span>Mettre la vidéo en pause quand j’envoie une question</span><small>Fige le moment exact utilisé comme contexte.</small></div><input type="checkbox" id="pause-on-question" /></label>
       </div>
     </section>
@@ -98,7 +98,7 @@
       <div class="section-heading"><div><h2>Transcription</h2><p>Professor Ask utilise les sous-titres YouTube lorsqu’ils existent et les transforme en transcription horodatée utilisable autour du moment actuel.</p></div></div>
       <div class="settings-grid">
         <label class="field"><span>Fenêtre de transcription autour du timestamp</span><select id="context-seconds"><option value="60">± 1 minute</option><option value="180">± 3 minutes</option><option value="300">± 5 minutes</option><option value="600">± 10 minutes</option></select></label>
-        <label class="field"><span>Langue de transcription préférée</span><select id="transcript-language"><option value="auto">Automatique</option><option value="fr">Français en priorité</option><option value="en">Anglais en priorité</option></select></label>
+        <label class="field"><span>Langue de transcription préférée</span><select id="transcript-language"><option value="auto">Automatique</option><option value="fr">Français en priorité</option><option value="en">Anglais en priorité</option></select><small>Si cette langue existe sur YouTube, elle est réellement prioritaire, y compris face à une piste manuelle dans une autre langue.</small></label>
         <label class="toggle-row"><div><span>Inclure le titre et la chaîne</span><small>Ajoute les métadonnées de la vidéo à la question.</small></div><input type="checkbox" id="include-metadata" /></label>
       </div>
     </section>
@@ -115,12 +115,12 @@
       <div class="section-heading"><div><h2>Historique et confidentialité</h2><p>Les conversations de l’extension restent stockées localement.</p></div></div>
       <div class="settings-grid">
         <label class="toggle-row"><div><span>Mémoriser les conversations par vidéo</span><small>Retrouve la discussion quand tu reviens sur la vidéo.</small></div><input type="checkbox" id="remember-history" /></label>
-        <label class="field"><span>Messages conservés par vidéo</span><select id="history-limit"><option value="10">10 messages</option><option value="30">30 messages</option><option value="50">50 messages</option></select></label>
+        <label class="field" id="history-limit-field"><span>Messages conservés par vidéo</span><select id="history-limit"><option value="10">10 messages</option><option value="30">30 messages</option><option value="50">50 messages</option></select></label>
       </div>
       <div class="danger-actions"><button class="button danger" id="clear-history">Effacer tout l’historique</button><button class="button" id="reset-settings">Réinitialiser les paramètres</button></div>
     </section>
 
-    <footer class="footer-note"><span>Codex OAuth + fournisseurs <code>API</code></span><span>Professor Ask v0.9.9</span></footer>
+    <footer class="footer-note"><span>Codex OAuth + fournisseurs <code>API</code></span><span>Professor Ask v0.10.0</span></footer>
   </main>
   <script type="module" src="index.js"></script>
 </body>
