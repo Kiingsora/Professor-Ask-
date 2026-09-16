@@ -66,7 +66,7 @@
 .pa-transcript-drawer-head strong { font-size: 12px; }
 .pa-transcript-drawer-head span { color: var(--pa-muted); font-size: 11px; text-align: right; }
 .pa-transcript-lines { max-height: 190px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--pa-text); font-size: 12px; line-height: 1.55; }
-.pa-messages { flex: 1; min-height: 230px; max-height: 440px; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.pa-messages { flex: 1; min-height: 230px; max-height: 440px; overflow: auto; overscroll-behavior-y: contain; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .pa-size-compact .pa-messages { min-height: 180px; max-height: 300px; }
 .pa-size-standard .pa-messages { min-height: 230px; max-height: 440px; }
 .pa-size-large .pa-messages { min-height: 340px; max-height: 620px; }
