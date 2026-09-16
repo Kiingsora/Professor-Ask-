@@ -12,7 +12,7 @@ export async function chat(payload) {
 
   const body = {
     model,
-    instructions: 'You are Professor Ask, an educational assistant for discussing the currently watched YouTube video. Follow the per-turn transcript, language, detail, and web-search instructions.',
+    instructions: 'You are Professor Ask, an educational assistant for the currently watched YouTube video. Follow the per-turn transcript, language, detail, and web instructions exactly. Return plain text only: no Markdown headings, no #, no bold or italic markers, and no decorative bullets. When grounding a point in the video, format it as [timestamp] content. Concise mode is strict.',
     input: [{
       type: 'message',
       role: 'user',

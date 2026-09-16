@@ -26,15 +26,6 @@
     return Number.isFinite(value) ? value : null;
   }
 
-  function updatePreviewButton(enabled) {
-    const button = PA.qs('#pa-transcript-preview');
-    if (!button) return;
-    button.disabled = !enabled;
-    button.title = enabled
-      ? 'Afficher les lignes du contexte autour du moment actuel.'
-      : 'Le contexte horodaté doit être prêt avant de pouvoir l’afficher.';
-  }
-
   function updateSourceIndicator(source, state, title = '', errorText = '') {
     const icon = PA.qs(`#pa-${source}-icon`);
     const label = PA.qs(`#pa-${source}-text`);
@@ -46,7 +37,11 @@
     label.textContent = errorText;
     label.hidden = !errorText;
     container?.classList.toggle('has-error', !!errorText);
-    if (container) container.title = title || errorText || 'État du contexte vidéo';
+
+    if (container) {
+      const interaction = source === 'subtitles' ? ' Cliquer pour afficher ou masquer la transcription.' : '';
+      container.title = `${title || errorText || 'État de la transcription.'}${interaction}`.trim();
+    }
   }
 
   function updateSubtitles(status, diagnostics, error) {
@@ -62,7 +57,7 @@
         const kind = diagnostics?.source_kind === 'manual' ? 'manuels' : diagnostics?.source_kind === 'automatic' ? 'automatiques' : 'disponibles';
         updateSourceIndicator('subtitles', 'is-ok', `${count} piste${count > 1 ? 's' : ''} YouTube détectée${count > 1 ? 's' : ''} · ${kind}.`);
       } else {
-        updateSourceIndicator('subtitles', 'is-unknown', 'Le contexte a été récupéré mais aucune piste distincte n’a été confirmée.');
+        updateSourceIndicator('subtitles', 'is-unknown', 'La transcription a été récupérée mais aucune piste distincte n’a été confirmée.');
       }
       return;
     }
@@ -86,22 +81,22 @@
 
   function updateTranscription(status, diagnostics, error) {
     if (status === 'checking-youtube') {
-      updateSourceIndicator('transcription', 'is-checking', 'Récupération du contexte horodaté en cours.');
+      updateSourceIndicator('transcription', 'is-checking', 'Récupération de la transcription en cours.');
       return;
     }
 
     if (status === 'youtube-ready') {
-      updateSourceIndicator('transcription', 'is-ok', describeDiagnostics(diagnostics) || 'Contexte horodaté récupéré.');
+      updateSourceIndicator('transcription', 'is-ok', describeDiagnostics(diagnostics) || 'Transcription récupérée.');
       return;
     }
 
     if (status === 'local-engine-pending') {
-      updateSourceIndicator('transcription', 'is-missing', 'Aucun contexte horodaté YouTube disponible.');
+      updateSourceIndicator('transcription', 'is-missing', 'Aucune transcription YouTube disponible.');
       return;
     }
 
     if (status === 'failed') {
-      updateSourceIndicator('transcription', 'is-error', error || 'Impossible de récupérer le contexte horodaté.', `Erreur · ${shortErrorLabel(error)}`);
+      updateSourceIndicator('transcription', 'is-error', error || 'Impossible de récupérer la transcription.', `Erreur · ${shortErrorLabel(error)}`);
       return;
     }
 
@@ -114,51 +109,9 @@
     PA.state.transcriptError = error || null;
     if (diagnostics) PA.state.transcriptDiagnostics = diagnostics;
 
-    const badge = PA.qs('#pa-transcript');
-    const detail = PA.qs('#pa-transcript-detail');
-    const bar = PA.qs('#pa-transcript-bar');
-    if (!badge) return;
-
     const details = diagnostics || PA.state.transcriptDiagnostics || null;
-    bar?.classList.remove('is-ready', 'is-working', 'is-error');
     updateSubtitles(status, details, error);
     updateTranscription(status, details, error);
-
-    if (status === 'checking-youtube') {
-      badge.textContent = 'Recherche du contexte YouTube…';
-      if (detail) detail.textContent = 'Professor Ask vérifie les sources disponibles.';
-      bar?.classList.add('is-working');
-      updatePreviewButton(false);
-      return;
-    }
-
-    if (status === 'youtube-ready') {
-      badge.textContent = 'Contexte YouTube prêt';
-      if (detail) detail.textContent = describeDiagnostics(details) || 'Le contexte horodaté est prêt.';
-      bar?.classList.add('is-ready');
-      updatePreviewButton(true);
-      return;
-    }
-
-    if (status === 'local-engine-pending') {
-      badge.textContent = 'Contexte vidéo indisponible';
-      if (detail) detail.textContent = error || 'Aucun contexte YouTube exploitable n’a été trouvé.';
-      bar?.classList.add('is-error');
-      updatePreviewButton(false);
-      return;
-    }
-
-    if (status === 'failed') {
-      const fullError = error || 'Erreur pendant la récupération du contexte YouTube.';
-      badge.textContent = 'Contexte indisponible';
-      if (detail) detail.textContent = fullError;
-      bar?.classList.add('is-error');
-      updatePreviewButton(false);
-      return;
-    }
-
-    badge.textContent = 'Contexte vidéo…';
-    if (detail) detail.textContent = error || '';
-    updatePreviewButton(false);
+    PA.refreshTranscriptPreview?.();
   };
 })();

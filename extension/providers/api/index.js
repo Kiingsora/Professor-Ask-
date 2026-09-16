@@ -6,9 +6,9 @@ const MODEL_CACHE_MS = 5 * 60 * 1000;
 const modelCache = new Map();
 
 function maxOutputTokens(style) {
-  if (style === 'concise') return 1600;
-  if (style === 'detailed') return 6000;
-  return 3200;
+  if (style === 'concise') return 480;
+  if (style === 'detailed') return 5000;
+  return 2200;
 }
 
 function normalizeModelId(value) {
@@ -141,8 +141,7 @@ export async function models(body = {}) {
 async function resolveModel(provider, requested, key) {
   if (requested && requested !== 'auto') return normalizeModelId(requested);
 
-  const cached = modelCache.get(provider);
-  let catalog = cached && Date.now() - cached.at < MODEL_CACHE_MS ? cached.models : null;
+  let catalog = modelCache.get(provider)?.models;
   if (!catalog?.length) {
     catalog = await fetchModels(provider, key);
     if (catalog.length) modelCache.set(provider, { at: Date.now(), models: catalog });
@@ -168,14 +167,19 @@ function apiPrompt(payload) {
   });
 }
 
-async function chatOpenAiCompatible(provider, config, key, model, prompt) {
+async function chatOpenAiCompatible(provider, config, key, model, prompt, style) {
+  const requestBody = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+  };
+  const tokenLimit = maxOutputTokens(style);
+  if (provider === 'openai') requestBody.max_completion_tokens = tokenLimit;
+  else requestBody.max_tokens = tokenLimit;
+
   const data = await requestJson(config.chatUrl, {
     method: 'POST',
     headers: headersFor(provider, key, true),
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    body: JSON.stringify(requestBody),
   }, `${config.label} a refusé la requête de chat.`);
 
   const content = data?.choices?.[0]?.message?.content;
@@ -186,34 +190,6 @@ async function chatOpenAiCompatible(provider, config, key, model, prompt) {
       : '';
   if (!answer) throw new Error(`${config.label} a terminé la réponse sans texte exploitable.`);
   return { answer, sources: [], model, usage: data?.usage || null };
-}
-
-function openAiResponseText(data) {
-  if (typeof data?.output_text === 'string' && data.output_text.trim()) return data.output_text.trim();
-  const output = Array.isArray(data?.output) ? data.output : [];
-  return output
-    .flatMap(item => Array.isArray(item?.content) ? item.content : [])
-    .filter(part => part?.type === 'output_text' && typeof part?.text === 'string')
-    .map(part => part.text)
-    .join('')
-    .trim();
-}
-
-async function chatOpenAiResponses(config, key, model, prompt, style) {
-  const data = await requestJson(config.chatUrl, {
-    method: 'POST',
-    headers: headersFor('openai', key, true),
-    body: JSON.stringify({
-      model,
-      input: prompt,
-      max_output_tokens: maxOutputTokens(style),
-      store: false,
-    }),
-  }, 'OpenAI a refusé la requête de réponse.');
-
-  const answer = openAiResponseText(data);
-  if (!answer) throw new Error('OpenAI a terminé la réponse sans texte exploitable.');
-  return { answer, sources: [], model: data?.model || model, usage: data?.usage || null };
 }
 
 async function chatAnthropic(config, key, model, prompt, style) {
@@ -269,10 +245,7 @@ export async function chat(payload = {}) {
   if (config.protocol === 'gemini') {
     return chatGemini(config, key, model, prompt, payload.settings?.responseStyle);
   }
-  if (config.protocol === 'openai-responses') {
-    return chatOpenAiResponses(config, key, model, prompt, payload.settings?.responseStyle);
-  }
-  return chatOpenAiCompatible(provider, config, key, model, prompt);
+  return chatOpenAiCompatible(provider, config, key, model, prompt, payload.settings?.responseStyle);
 }
 
 export const apiKeyProvider = {

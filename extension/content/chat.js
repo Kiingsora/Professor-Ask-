@@ -48,8 +48,8 @@
 
     const model = PA.selectedModelName();
     const sourceLabel = hasVideoContext
-      ? (PA.state.transcriptSource === 'generated' ? 'transcription IA' : 'sous-titres YouTube')
-      : 'aucun contexte vidéo';
+      ? (PA.state.transcriptSource === 'generated' ? 'transcription IA' : 'transcription YouTube')
+      : 'aucune transcription';
     const placeholder = PA.addMessage(
       'assistant',
       'Réflexion…',

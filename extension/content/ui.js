@@ -1,6 +1,19 @@
 (() => {
   const PA = globalThis.ProfessorAskContent;
 
+  function cleanPlainText(value) {
+    return String(value || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+      .replace(/\*\*(.*?)\*\*/gs, '$1')
+      .replace(/__(.*?)__/gs, '$1')
+      .replace(/^\s*[-*•]\s+/gm, '')
+      .replace(/`([^`\n]+)`/g, '$1')
+      .replace(/\*\*/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   PA.applyAppearance = function applyAppearance() {
     const root = PA.qs('#professor-ask-root');
     if (!root) return;
@@ -20,9 +33,9 @@
     if (!status) return;
 
     if (PA.state.connected) {
-      status.innerHTML = `<span class="pa-dot ok"></span><span>${PA.providerName()} connecté</span>`;
+      status.innerHTML = '<span class="pa-dot ok"></span><span>Connecté</span>';
     } else {
-      status.innerHTML = `<span class="pa-dot warn"></span><span>${PA.providerName()} hors ligne</span>`;
+      status.innerHTML = '<span class="pa-dot warn"></span><span>Hors ligne</span>';
     }
   };
 
@@ -59,9 +72,12 @@
   };
 
   PA.formatAnswer = function formatAnswer(answer, sources) {
-    let text = answer || '(Réponse vide)';
+    let text = cleanPlainText(answer || '(Réponse vide)');
     if (Array.isArray(sources) && sources.length) {
-      text += '\n\nSources :\n' + sources.slice(0, 6).map(source => `• ${source.title || source.url} — ${source.url}`).join('\n');
+      const sourceLines = sources.slice(0, 6)
+        .map(source => `${source.title || source.url} — ${source.url}`)
+        .filter(Boolean);
+      if (sourceLines.length) text += `\n\nSources :\n${sourceLines.join('\n')}`;
     }
     return text;
   };
@@ -84,24 +100,23 @@
         </header>
         <div class="pa-toolbar">
           <span class="pa-pill" id="pa-time">0:00</span>
-          <span class="pa-source-state" id="pa-subtitles-state" title="Vérification des pistes YouTube">
+          <span class="pa-source-state pa-source-toggle" id="pa-subtitles-state" role="button" tabindex="0" aria-expanded="false" aria-controls="pa-transcript-drawer" title="Vérification des pistes YouTube">
             <span class="pa-source-icon pa-source-icon-subtitles is-checking" id="pa-subtitles-icon" role="img" aria-label="État des sous-titres"></span>
             <span class="pa-source-error" id="pa-subtitles-text" hidden></span>
           </span>
-          <span class="pa-source-state" id="pa-transcription-state" title="Vérification du contexte horodaté">
+          <span class="pa-source-state" id="pa-transcription-state" title="Vérification de la transcription">
             <span class="pa-source-icon pa-source-icon-transcript is-checking" id="pa-transcription-icon" role="img" aria-label="État de la transcription"></span>
             <span class="pa-source-error" id="pa-transcription-text" hidden></span>
           </span>
           <span class="pa-pill" id="pa-provider">Codex</span>
           <span class="pa-status" id="pa-status"></span>
         </div>
-        <div class="pa-transcript-bar" id="pa-transcript-bar">
-          <div class="pa-transcript-copy">
-            <span class="pa-transcript-label">Contexte vidéo</span>
-            <strong id="pa-transcript">Recherche du contexte…</strong>
-            <span class="pa-transcript-detail" id="pa-transcript-detail">Vérification du contexte YouTube.</span>
+        <div class="pa-transcript-drawer" id="pa-transcript-drawer" hidden>
+          <div class="pa-transcript-drawer-head">
+            <strong>Transcription</strong>
+            <span id="pa-transcript-drawer-detail"></span>
           </div>
-          <button class="pa-transcript-preview" id="pa-transcript-preview" type="button" disabled>Voir le contexte</button>
+          <div class="pa-transcript-lines" id="pa-transcript-lines">Transcription en cours de récupération…</div>
         </div>
         <div class="pa-messages" id="pa-messages">
           <div class="pa-empty" id="pa-empty">Pose une question sur ce qui vient d'être dit dans la vidéo.</div>
@@ -122,7 +137,14 @@
       }
     });
 
-    PA.qs('#pa-transcript-preview')?.addEventListener('click', () => PA.showTranscriptPreview?.());
+    const subtitleToggle = PA.qs('#pa-subtitles-state');
+    subtitleToggle?.addEventListener('click', () => PA.toggleTranscriptPreview?.());
+    subtitleToggle?.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        PA.toggleTranscriptPreview?.();
+      }
+    });
 
     PA.applyAppearance();
     PA.loadHistory();
