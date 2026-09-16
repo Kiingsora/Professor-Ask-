@@ -2,18 +2,22 @@
   const PA = globalThis.ProfessorAskContent;
 
   async function onVideoChanged() {
+    if (PA.state.contextValid === false) return;
+
     PA.state.videoId = PA.getVideoId();
     if (!PA.state.videoId) return;
 
     PA.injectPanel();
-    await PA.loadSettings();
+    const settingsLoaded = await PA.loadSettings();
+    if (!settingsLoaded || PA.state.contextValid === false) return;
+
     await PA.loadHistory();
     await PA.loadTranscript();
     await PA.fetchProviderStatus();
   }
 
   PA.ext.storage.onChanged.addListener(async (changes, area) => {
-    if (area !== 'sync') return;
+    if (area !== 'sync' || PA.state.contextValid === false) return;
 
     const previousTranscriptLanguage = PA.state.settings.transcriptLanguage;
     const previousProvider = PA.state.settings.provider;
@@ -30,6 +34,8 @@
   });
 
   setInterval(() => {
+    if (PA.state.contextValid === false) return;
+
     if (location.href !== PA.state.lastUrl) {
       PA.state.lastUrl = location.href;
       setTimeout(onVideoChanged, 500);
@@ -41,6 +47,7 @@
   }, 500);
 
   setInterval(() => {
+    if (PA.state.contextValid === false) return;
     if (PA.getVideoId()) PA.fetchProviderStatus();
   }, 60000);
 
