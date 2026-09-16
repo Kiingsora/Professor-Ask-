@@ -51,18 +51,21 @@ extension/
 │  └─ router.js
 ├─ providers/
 │  ├─ codex/                    # ChatGPT/Codex OAuth + transport
-│  ├─ api/                      # multi-provider API-key transport
-│  │  ├─ config.js
-│  │  ├─ storage.js
-│  │  └─ index.js
+│  ├─ api/                      # multi-provider API-key path
+│  │  ├─ config.js              # provider definitions
+│  │  ├─ models.js              # model discovery + cache
+│  │  ├─ storage.js             # API-key storage
+│  │  ├─ transport.js           # provider HTTP protocols
+│  │  └─ index.js               # provider orchestration
 │  └─ shared/
 │     └─ prompt.js
 ├─ content/
-│  ├─ core.js
-│  ├─ app.js
-│  ├─ ui.js
-│  ├─ chat.js
-│  ├─ history.js
+│  ├─ core.js                   # shared state + extension bridge
+│  ├─ app.js                    # lifecycle
+│  ├─ answer.js                 # answer + citation rendering
+│  ├─ ui.js                     # panel + message UI
+│  ├─ chat.js                   # question flow
+│  ├─ history.js                # local conversation history
 │  ├─ style.css
 │  └─ transcript/
 │     ├─ youtube-panel-main.js
@@ -72,6 +75,7 @@ extension/
 │     ├─ preview.js
 │     └─ manager.js
 ├─ options/
+├─ icons/
 ├─ manifest.json                # Chromium MV3
 └─ manifest.firefox.json        # Firefox MV3
 
