@@ -108,3 +108,25 @@ dist/firefox/
 ```
 
 For local Firefox testing, open `about:debugging`, choose **This Firefox**, then **Load Temporary Add-on** and select `dist/firefox/manifest.json`.
+
+## Permanent Firefox installation
+
+Firefox Release requires a Mozilla-signed add-on for a permanent installation. Professor Ask uses the fixed Gecko ID `professor-ask@kiingsora.dev` and includes a GitHub Actions workflow that builds the Firefox package, sends it to Mozilla as an **unlisted** add-on for signing, then exposes the signed `.xpi` as a workflow artifact.
+
+One-time setup:
+
+1. Create/sign in to a Mozilla Add-ons developer account and generate API credentials for `web-ext`.
+2. In the GitHub repository, open **Settings > Secrets and variables > Actions** and create these repository secrets:
+   - `AMO_API_KEY`
+   - `AMO_API_SECRET`
+
+Do not commit or paste the secret values into source files.
+
+To create a signed build:
+
+1. Open **GitHub > Actions > Sign Firefox Extension**.
+2. Choose **Run workflow**.
+3. When the workflow finishes, download the `professor-ask-firefox-signed` artifact.
+4. Extract the artifact and install the `.xpi` in Firefox.
+
+The signing workflow is stored at `.github/workflows/firefox-sign.yml` and uses `web-ext sign --channel=unlisted`.
