@@ -77,6 +77,12 @@
 .pa-msg.error { align-self: stretch; color: #ffb4b4; background: #3a2020; }
 .pa-theme-light .pa-msg.error { color: #8c2020; background: #ffe4e4; }
 .pa-msg-meta { color: var(--pa-muted); font-size: 11px; margin-bottom: 4px; }
+.pa-msg-body { min-width: 0; }
+.pa-citation { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; margin: 0 2px; padding: 0 6px; border: 1px solid var(--pa-line-strong); border-radius: 999px; background: var(--pa-surface-2); color: var(--pa-text); font-size: 11px; font-weight: 700; line-height: 1; text-decoration: none; vertical-align: 1px; white-space: nowrap; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+.pa-citation:hover { background: var(--pa-button); color: var(--pa-button-text); border-color: var(--pa-button); text-decoration: none; }
+.pa-citation:focus-visible { outline: 2px solid #777; outline-offset: 2px; }
+.pa-answer-sources { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--pa-line); white-space: normal; }
+.pa-answer-sources-label { margin-right: 2px; color: var(--pa-muted); font-size: 11px; }
 .pa-composer { padding: 10px; border-top: 1px solid var(--pa-line); display: flex; gap: 8px; align-items: flex-end; }
 .pa-input { flex: 1; resize: vertical; min-height: 42px; max-height: 120px; border: 1px solid var(--pa-line-strong); background: var(--pa-input); color: var(--pa-text); border-radius: 12px; padding: 10px 11px; outline: none; }
 .pa-input:focus { border-color: #777; }
