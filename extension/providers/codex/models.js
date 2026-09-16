@@ -7,13 +7,26 @@ import { parseResponse, responseError } from './response.js';
 let cache = { accountId: null, at: 0, models: [] };
 
 function normalizeEfforts(item) {
-  const raw = item?.supported_reasoning_efforts || item?.supportedReasoningEfforts || item?.reasoning_efforts || [];
+  const raw = item?.supported_reasoning_levels
+    || item?.supportedReasoningLevels
+    || item?.supported_reasoning_efforts
+    || item?.supportedReasoningEfforts
+    || item?.reasoning_efforts
+    || [];
   if (!Array.isArray(raw)) return [];
 
   return [...new Set(raw.map(entry => {
     if (typeof entry === 'string') return entry;
-    return entry?.reasoning_effort || entry?.reasoningEffort || entry?.effort || null;
+    return entry?.effort || entry?.reasoning_effort || entry?.reasoningEffort || null;
   }).filter(Boolean))];
+}
+
+function normalizeDefaultEffort(item) {
+  return item?.default_reasoning_level
+    || item?.defaultReasoningLevel
+    || item?.default_reasoning_effort
+    || item?.defaultReasoningEffort
+    || null;
 }
 
 function withSparkFallback(models) {
@@ -47,7 +60,7 @@ export async function models({ force = false } = {}) {
         id,
         label: item.display_name || item.displayName || item.name || id,
         isDefault: !!(item.is_default || item.isDefault),
-        defaultEffort: item.default_reasoning_effort || item.defaultReasoningEffort || null,
+        defaultEffort: normalizeDefaultEffort(item),
         efforts: normalizeEfforts(item),
       };
     });
